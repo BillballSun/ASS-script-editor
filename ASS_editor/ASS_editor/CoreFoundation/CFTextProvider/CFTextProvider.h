@@ -19,4 +19,6 @@ CFTextProviderRef CFTextProviderCreateWithString(const char *string);
 
 CFTextProviderRef CFTextProviderCreateWithWcharString(const wchar_t *string);
 
+void CFTextProviderDestory(CFTextProviderRef textProvider);
+
 #endif /* CFTextProvider_h */

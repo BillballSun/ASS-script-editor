@@ -25,9 +25,9 @@ extern const char * const CFExceptionNameProcessFailed;
 
 #pragma mark - Function
 
-typedef bool (*CFExceptionCatchFunction)(const char * restrict exceptionName, void * restrict data);
+typedef bool (*CFExceptionCatchFunction)(const char * exceptionName, void * data);
 
-void CFExceptionRaise(const char * restrict exceptionName, void * restrict data, const char * restrict format, ...);
+void CFExceptionRaise(const char * exceptionName, void * data, const char * format, ...);
 
 void CFExceptionCatchStackPush(CFExceptionCatchFunction function);
 

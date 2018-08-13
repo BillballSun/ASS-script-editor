@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include "CFASSFileDialogue.h"
 #include "CFASSFileDialogue_Private.h"
@@ -20,6 +21,9 @@
 #include "CFASSFileDialogueText.h"
 #include "CFASSFileDialogueText_Private.h"
 #include "CFUseTool.h"
+#include "CFException.h"
+#include "CFASSFileChange.h"
+#include "CFASSFileChange_Private.h"
 
 //[Events]
 //Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -31,9 +35,9 @@ typedef struct CFASSFileDialogueTime {
 
 struct CFASSFileDialogue
 {
-    unsigned int layer;                     // Subtitles having different la!er number 5ill be ignore# during the collusion detection.
+    unsigned int layer;                     // Subtitles having different layer number will be ignore during the collusion detection.
                                             // Higher numberer layers will be drawn over the lower numbers.
-    CFASSFileDialogueTime start, end;       // 0:00:00:00 format ie. Hrs:Mins:Secs:hundredths.
+    CFASSFileDialogueTime start, end;       // 0:00:00.00 format ie. Hrs:Mins:Secs:hundredths.
     wchar_t *style;                         // name for style, NULL for empty
     wchar_t *name;                          // name for speaker, NULL for empty
     unsigned int marginL, marginR, marginV;
@@ -42,6 +46,49 @@ struct CFASSFileDialogue
 };
 
 static bool CFASSFileDialogueTimeFormatCheck(CFASSFileDialogueTime time);
+
+static CFASSFileDialogueTime CFASSFileDialogueTimeOffset(CFASSFileDialogueTime fromTime, long hundredths);
+
+void CFASSFileDialogueMakeChange(CFASSFileDialogueRef dialogue, CFASSFileChangeRef change)
+{
+    if(dialogue == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogue %p MakeChange %p", dialogue, change);
+    if(change->type & CFASSFileChangeTypeTimeOffset)
+    {
+        dialogue->start = CFASSFileDialogueTimeOffset(dialogue->start, change->timeOffset.hundredths);
+        dialogue->end = CFASSFileDialogueTimeOffset(dialogue->end, change->timeOffset.hundredths);
+    }
+    if(dialogue->effect!=NULL)
+        CFASSFileDialogueEffectMakeChange(dialogue->effect, change);
+    CFASSFileDialogueTextMakeChange(dialogue->text, change);
+}
+
+static CFASSFileDialogueTime CFASSFileDialogueTimeOffset(CFASSFileDialogueTime fromTime, long hundredths)
+{
+    struct tm temp;
+    temp.tm_hour = fromTime.hour;
+    temp.tm_min = fromTime.min;
+    temp.tm_sec = fromTime.sec;
+    temp.tm_year = 0;
+    hundredths += fromTime.hundredths;
+    long absoluteOffset = labs(hundredths)/100;
+    // hundredths %= 100;
+    if(hundredths>=0)
+        temp.tm_sec += absoluteOffset;
+    else
+        temp.tm_sec -= absoluteOffset;
+    if(hundredths<0)
+    {
+        temp.tm_sec--;
+        hundredths = labs(hundredths);
+        hundredths %= 100;
+        hundredths = 100 - hundredths;
+    }
+    else
+        hundredths %= 100;
+    mktime(&temp);
+    return (CFASSFileDialogueTime){.hour = temp.tm_hour, .min = temp.tm_min, .sec = temp.tm_sec, .hundredths = (unsigned int)hundredths};
+}
 
 CFASSFileDialogueRef CFASSFileDialogueCopy(CFASSFileDialogueRef dialogue)
 {
@@ -88,17 +135,17 @@ CFASSFileDialogueRef CFASSFileDialogueCreateWithString(const wchar_t *source)
        || source[scanAmount] == L'\n')
         return NULL;
     
-    if(*timeFormat1 == L'.')
+    if(*timeFormat1 == L':')
     {
-        if(start.hundredths > 99) return;
-        start.hundredths*= 0.6;
-        if(start.hundredths>59) start.hundredths = 59;
+        if(start.hundredths > 59) return NULL;
+        start.hundredths*= (10.0/3);
+        if(start.hundredths>99) start.hundredths = 99;
     }
-    if(*timeFormat2 == L'.')
+    if(*timeFormat2 == L':')
     {
-        if(end.hundredths > 99) return;
-        end.hundredths*= 0.6;
-        if(end.hundredths>59) end.hundredths = 59;
+        if(end.hundredths > 59) return NULL;
+        end.hundredths*= (10.0/3);
+        if(end.hundredths>99) end.hundredths = 99;
     }
     
     if(!CFASSFileDialogueTimeFormatCheck(start) || !CFASSFileDialogueTimeFormatCheck(end))
@@ -204,7 +251,7 @@ CFASSFileDialogueRef CFASSFileDialogueCreateWithString(const wchar_t *source)
 
 static bool CFASSFileDialogueTimeFormatCheck(CFASSFileDialogueTime time)
 {
-    if(time.min>59 || time.sec>59 || time.hundredths >59) return false;
+    if(time.min>59 || time.sec>59 || time.hundredths >99) return false;
     return true;
 }
 
@@ -216,7 +263,7 @@ int CFASSFileDialogueStoreStringResult(CFASSFileDialogueRef dialogue, wchar_t *t
         FILE *fp = tmpfile();
         if(fp == NULL) return -1;
         
-        temp = fwprintf(fp, L"Dialogue: %u,%u:%u:%u:%u,%u:%u:%u:%u,",
+        temp = fwprintf(fp, L"Dialogue: %u,%u:%02u:%02u.%02u,%u:%02u:%02u.%02u,",
                         dialogue->layer,
                         dialogue->start.hour, dialogue->start.min, dialogue->start.sec, dialogue->start.hundredths,
                         dialogue->end.hour, dialogue->end.min, dialogue->end.sec, dialogue->end.hundredths);
@@ -249,7 +296,7 @@ int CFASSFileDialogueStoreStringResult(CFASSFileDialogueRef dialogue, wchar_t *t
     }
     else
     {
-        temp = swprintf(targetPoint, SIZE_MAX, L"Dialogue: %u,%u:%u:%u:%u,%u:%u:%u:%u,",
+        temp = swprintf(targetPoint, SIZE_MAX, L"Dialogue: %u,%u:%02u:%02u.%02u,%u:%02u:%02u.%02u,",
                         dialogue->layer,
                         dialogue->start.hour, dialogue->start.min, dialogue->start.sec, dialogue->start.hundredths,
                         dialogue->end.hour, dialogue->end.min, dialogue->end.sec, dialogue->end.hundredths);
@@ -294,54 +341,3 @@ void CFASSFileDialogueDestory(CFASSFileDialogueRef dialogue)
     CFASSFileDialogueTextDestory(dialogue->text);
     free(dialogue);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

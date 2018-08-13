@@ -27,9 +27,9 @@ static CFPointerArrayRef CFExceptionStack = NULL;
 
 static void CFExceptionStackInitialization(void);
 
-static bool CFExceptionDefaultCatchFunction(const char * restrict exceptionName, void * restrict data);
+static bool CFExceptionDefaultCatchFunction(const char * exceptionName, void * data);
 
-void CFExceptionRaise(const char * restrict exceptionName, void * restrict data, const char * restrict format, ...)
+void CFExceptionRaise(const char * exceptionName, void * data, const char * format, ...)
 {
     if(CFExceptionStack == NULL) CFExceptionStackInitialization();
     size_t arrayLength = CFPointerArrayGetLength(CFExceptionStack);
@@ -75,7 +75,7 @@ CFExceptionCatchFunction CFExceptionCatchStackCurrentFunction(void)
     return result;
 }
 
-static bool CFExceptionDefaultCatchFunction(const char * restrict exceptionName, void * restrict data)
+static bool CFExceptionDefaultCatchFunction(const char * exceptionName, void * data)
 {
     raise(SIGABRT);
     return true;

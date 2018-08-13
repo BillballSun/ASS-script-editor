@@ -20,6 +20,16 @@ typedef enum CF3DAxis {
     CF3DAxisZ
 } CF3DAxis;
 
+typedef enum CFTextEncoding
+{
+    CFTextEncodingUnkown,
+    CFTextEncodingUTF8,
+    CFTextEncodingUTF16BE,
+    CFTextEncodingUTF16LE,
+    CFTextEncodingUTF32BE,
+    CFTextEncodingUTF32LE
+} CFTextEncoding;
+
 typedef struct CFUSize
 {
     unsigned int x, y;

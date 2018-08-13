@@ -14,14 +14,63 @@
 #include "CFASSFileDialogueText.h"
 #include "CFASSFileDialogueText_Private.h"
 #include "CFASSFileDialogueTextContent.h"
-#include "CFASSFileDialogueTextContent_Prvivate.h"
+#include "CFASSFileDialogueTextContent_Private.h"
 #include "CFPointerArray.h"
 #include "CFException.h"
+#include "CFEnumerator.h"
+#include "CFASSFileChange.h"
+#include "CFASSFileChange_Private.h"
 
 struct CFASSFileDialogueText
 {
-    CFPointerArrayRef contentArray;
+    CFPointerArrayRef contentArray;     // Can't be empty, must at least have CFASSFileDialogueTextContentCreateEmptyString();
 };
+
+void CFASSFileDialogueTextMakeChange(CFASSFileDialogueTextRef dialogueText, CFASSFileChangeRef change)
+{
+    if(dialogueText == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueText %p MakeChange %p", dialogueText, change);
+    CFEnumeratorRef enumerator;
+    CFASSFileDialogueTextContentRef eachTextContent = NULL;
+    
+    if(change->type & CFASSFileChangeTypeDiscardAllOverride)
+    {
+		bool checkPoint;
+		size_t index, length;
+		do
+		{
+			checkPoint = false;
+			length = CFPointerArrayGetLength(dialogueText->contentArray);
+			for (index = 0; index < length; index++)
+			{
+				eachTextContent = CFPointerArrayGetPointerAtIndex(dialogueText->contentArray, index);
+				if (CFASSFileDialogueTextContentGetType(eachTextContent) == CFASSFileDialogueTextContentTypeOverride)
+				{
+					checkPoint = true;
+					break;
+				}
+			}
+			if (checkPoint)
+			{
+				CFPointerArrayRemovePointerAtIndex(dialogueText->contentArray, index, false);
+				CFASSFileDialogueTextContentDestory(eachTextContent);
+			}
+		} while (checkPoint);
+        if(CFPointerArrayGetLength(dialogueText->contentArray) == 0)
+            CFPointerArrayAddPointer(dialogueText->contentArray, CFASSFileDialogueTextContentCreateEmptyString(), false);
+    }
+    enumerator = CFASSFileDialogueTextCreateEnumerator(dialogueText);
+    while ((eachTextContent = CFEnumeratorNextObject(enumerator)) != NULL)
+        CFASSFileDialogueTextContentMakeChange(eachTextContent, change);
+    CFEnumeratorDestory(enumerator);
+}
+
+CFEnumeratorRef CFASSFileDialogueTextCreateEnumerator(CFASSFileDialogueTextRef dialogueText)
+{
+    if(dialogueText == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueText NULL CreateEnumerator");
+    return CFEnumeratorCreateFromArray(dialogueText->contentArray);
+}
 
 void CFASSFileDialogueTextAddContent(CFASSFileDialogueTextRef dialogueText, CFASSFileDialogueTextContentRef content)
 {
@@ -141,6 +190,7 @@ CFASSFileDialogueTextRef CFASSFileDialogueTextCreateWithString(const wchar_t *so
             for(unsigned int index = 0; index<arrayLength; index++)
                 CFASSFileDialogueTextContentDestory((CFASSFileDialogueTextContentRef)
                                                     CFPointerArrayGetPointerAtIndex(result->contentArray, index));
+            CFPointerArrayDestory(result->contentArray);
         }
         free(result);
     }
@@ -152,6 +202,7 @@ void CFASSFileDialogueTextDestory(CFASSFileDialogueTextRef dialogueText)
     size_t arrayLength = CFPointerArrayGetLength(dialogueText->contentArray);   
     for(unsigned int index = 0; index<arrayLength; index++)
         CFASSFileDialogueTextContentDestory((CFASSFileDialogueTextContentRef)CFPointerArrayGetPointerAtIndex(dialogueText->contentArray, index));
+    CFPointerArrayDestory(dialogueText->contentArray);
     free(dialogueText);
 }
 
@@ -160,56 +211,3 @@ void function(void)
     int temp = 0;
     if(temp == '{') return;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

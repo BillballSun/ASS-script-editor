@@ -9,11 +9,15 @@
 #ifndef CFASSFileDialogueText_Private_h
 #define CFASSFileDialogueText_Private_h
 
+#pragma mark - Read File
+
 CFASSFileDialogueTextRef CFASSFileDialogueTextCreateWithString(const wchar_t *source);
 /* source */
 // begin with current text filed
 /* Discussion */
 // this function should handle the empty source, that is point to '\n' or '\0'
+
+#pragma mark - Store Result
 
 int CFASSFileDialogueTextStoreStringResult(CFASSFileDialogueTextRef text, wchar_t * targetPoint);
 /* targetPoint */

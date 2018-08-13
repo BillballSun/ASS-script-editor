@@ -16,8 +16,12 @@
 #include "CFASSFileStyleCollection.h"
 #include "CFASSFileDialogueCollection.h"
 #include "CFTextProvider.h"
+#include "CFDef.h"
+#include "CFASSFileChange.h"
 
 typedef struct CFASSFile *CFASSFileRef;
+
+#pragma mark - Create/Copy/Destory
 
 CFASSFileRef CFASSFileCreate(CFASSFileScriptInfoRef scriptInfo,
                              CFASSFileStyleCollectionRef styleCollection,
@@ -30,6 +34,12 @@ void CFASSFileDestory(CFASSFileRef file);
 
 CFASSFileRef CFASSFileCopy(CFASSFileRef file);
 
+#pragma mark - Allocate Result
+
 wchar_t *CFASSFileAllocateFileContent(CFASSFileRef file);
+
+#pragma mark - Receive Change
+
+void CFASSFileMakeChange(CFASSFileRef file, CFASSFileChangeRef change);
 
 #endif /* CFASSFile_h */

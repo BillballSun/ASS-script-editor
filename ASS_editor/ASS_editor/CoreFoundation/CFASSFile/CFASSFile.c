@@ -13,12 +13,14 @@
 #include "CFASSFileScriptInfo.h"
 #include "CFASSFileScriptInfo_Private.h"
 #include "CFASSFileStyleCollection.h"
-#include "CFASSFileStleCollection_Private.h"
+#include "CFASSFileStyleCollection_Private.h"
 #include "CFASSFileDialogueCollection.h"
 #include "CFASSFileDialogueCollection_Private.h"
 #include "CFTextProvider.h"
 #include "CFTextProvider_Private.h"
 #include "CFException.h"
+#include "CFASSFileChange.h"
+#include "CFASSFileChange_Private.h"
 
 struct CFASSFile
 {
@@ -27,8 +29,51 @@ struct CFASSFile
     CFASSFileDialogueCollectionRef dialogueCollection;
 };
 
+void CFASSFileMakeChange(CFASSFileRef file, CFASSFileChangeRef change)
+{
+    if(file == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFile %p MakeChange %p", file, change);
+    if(CFASSFileChangeShouldDispatchToScriptInfo(change))
+        CFASSFileScriptInfoMakeChange(file->scriptInfo, change);
+    if(CFASSFileChangeShouldDispatchToStyleCollection(change))
+        CFASSFileStyleCollectionMakeChange(file->styleCollection, change);
+    if(CFASSFileChangeShouldDispatchToDialogueCollection(change))
+        CFASSFileDialogueCollectionMakeChange(file->dialogueCollection, change);
+}
+
+void CFASSFileReceiveResolutionXYChangeFromScriptInfo(CFASSFileRef file, CFUSize oldSize, CFUSize newSize)
+{
+    if(file == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFile NULL ReceiveResolutionXYChangeFromScriptInfo");
+    double percentage = ((double)newSize.x/oldSize.x + (double)newSize.y/oldSize.y)/2;
+    CFASSFileChangeRef change = CFASSFileChangeFontSize(true, percentage, 0);
+    if(CFASSFileChangeShouldDispatchToStyleCollection(change))
+        CFASSFileStyleCollectionMakeChange(file->styleCollection, change);
+    if(CFASSFileChangeShouldDispatchToDialogueCollection(change))
+        CFASSFileDialogueCollectionMakeChange(file->dialogueCollection, change);
+}
+
+CFASSFileScriptInfoRef CFASSFileGetScriptInfo(CFASSFileRef file)
+{
+    if(file == NULL) return NULL;
+    return file->scriptInfo;
+}
+
+CFASSFileStyleCollectionRef CFASSFileGetStyleCollection(CFASSFileRef file)
+{
+    if(file == NULL) return NULL;
+    return file->styleCollection;
+}
+
+CFASSFileDialogueCollectionRef CFASSFileGetDialogueCollection(CFASSFileRef file)
+{
+    if(file == NULL) return NULL;
+    return file->dialogueCollection;
+}
+
 CFASSFileRef CFASSFileCopy(CFASSFileRef file)
 {
+    if(file == NULL) return NULL;
     CFASSFileRef result;
     if((result = malloc(sizeof(struct CFASSFile))) != NULL)
     {
@@ -167,54 +212,3 @@ wchar_t *CFASSFileAllocateFileContent(CFASSFileRef file)
     free(dialogueCollection);
     return result;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -10,12 +10,11 @@
 #define CFASSFileScriptInfo_h
 
 #include "CFUseTool.h"
+#include "CFASSFileChange.h"
 
 typedef struct CFASSFileScriptInfo *CFASSFileScriptInfoRef;
 
-CFASSFileScriptInfoRef CFASSFileScriptInfoCopy(CFASSFileScriptInfoRef scriptInfo);
-
-void CFASSFileScriptInfoDestory(CFASSFileScriptInfoRef scriptInfo);
+#pragma mark - Create/Copy/Destory
 
 CFASSFileScriptInfoRef CFASSFileScriptInfoCreateEssential(wchar_t *title,
                                                           wchar_t *original_script,
@@ -24,10 +23,16 @@ CFASSFileScriptInfoRef CFASSFileScriptInfoCreateEssential(wchar_t *title,
                                                           unsigned int play_res_y,
                                                           double timePercentage);
 
-void CFASSFileScriptInfoChangeResolutionXY(CFASSFileScriptInfoRef scriptInfo,
-                                           CFUSize newSize,
-                                           bool dispatchChange);
+CFASSFileScriptInfoRef CFASSFileScriptInfoCopy(CFASSFileScriptInfoRef scriptInfo);
+
+void CFASSFileScriptInfoDestory(CFASSFileScriptInfoRef scriptInfo);
+
+#pragma mark - Get Info
 
 CFUSize CFASSFileScriptInfoGetResolutionXY(CFASSFileScriptInfoRef scriptInfo);
+
+#pragma mark - Receive Change
+
+void CFASSFileScriptInfoMakeChange(CFASSFileScriptInfoRef scriptInfo, CFASSFileChangeRef change);
 
 #endif /* CFASSFileScriptInfo_h */

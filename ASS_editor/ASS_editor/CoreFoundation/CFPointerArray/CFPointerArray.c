@@ -10,10 +10,11 @@
 #include <stdbool.h>
 
 #include "CFPointerArray.h"
+#include "CFPointerArray_Private.h"
 #include "CFException.h"
 
-#define CFPointerArrayIntializedCapacity 42
-#define CFPointerArrayExtendCapacity 42
+#define CFPointerArrayIntializedCapacity 6
+#define CFPointerArrayExtendCapacity 6
 
 typedef struct CFPointerArrayItem
 {
@@ -32,24 +33,37 @@ static bool CFPointerArrayChangeStorage(CFPointerArrayRef array, size_t newStora
 
 static bool CFPointerArrayShrinkStorage(CFPointerArrayRef array);
 
+size_t *CFPointerArrayGetItemAmountCheckPoint(CFPointerArrayRef array)
+{
+    if(array == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFPointerArray NULL GetItemAmountCheckPoint");
+    return &array->itemAmount;
+}
+
 CFPointerArrayRef CFPointerArrayCopy(CFPointerArrayRef array, bool transferOwnership)
 {
-    size_t allocLength = array->itemAmount==0?1:array->itemAmount;
     CFPointerArrayRef result;
-    if((result = malloc(sizeof(struct CFPointerArrayItem) * allocLength)) != NULL)
+    if((result = malloc(sizeof(struct CFPointerArray))) != NULL)
     {
-        for(size_t index = 0; index<array->itemAmount; index++)
+        size_t allocLength = array->itemAmount==0?1:array->itemAmount;
+        if((result->dataArray = malloc(sizeof(struct CFPointerArrayItem) * allocLength)) != NULL)
         {
-            result->dataArray[index].pointer = result->dataArray[index].pointer;
-            if(transferOwnership && array->dataArray[index].hasOwnerShip)
+            for(size_t index = 0; index<array->itemAmount; index++)
             {
-                result->dataArray[index].hasOwnerShip = true;
-                array->dataArray[index].hasOwnerShip = false;
+                result->dataArray[index].pointer = array->dataArray[index].pointer;
+                if(transferOwnership && array->dataArray[index].hasOwnerShip)
+                {
+                    result->dataArray[index].hasOwnerShip = true;
+                    array->dataArray[index].hasOwnerShip = false;
+                }
+                else
+                    result->dataArray[index].hasOwnerShip = false;
             }
-            else
-                result->dataArray[index].hasOwnerShip = false;
+            result->arrayLength = allocLength;
+            result->itemAmount = array->itemAmount;
+            return result;
         }
-        return result;
+        free(result);
     }
     return NULL;
 }
@@ -159,12 +173,16 @@ void *CFPointerArrayRemovePointerAtIndex(CFPointerArrayRef array, size_t index, 
         return NULL;
     }
     void *returnValue = NULL;
-    if(array->dataArray[index].hasOwnerShip && !transferOwnership)
-        free(array->dataArray[index].pointer);
-    else
-        returnValue = array->dataArray[index].pointer;
+    if(array->dataArray[index].hasOwnerShip)
+    {
+        if(transferOwnership)
+            returnValue = array->dataArray[index].pointer;
+        else
+            free(array->dataArray[index].pointer);
+    }
     for(size_t currentIndex = index; currentIndex<array->itemAmount-1; currentIndex++)
         array->dataArray[currentIndex] = array->dataArray[currentIndex+1];
+    array->itemAmount--;
     return returnValue;
 }
 

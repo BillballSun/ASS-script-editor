@@ -10,13 +10,25 @@
 #define CFASSFileDialogueText_h
 
 #include "CFASSFileDialogueTextContent.h"
+#include "CFEnumerator.h"
+#include "CFASSFileChange.h"
 
 typedef struct CFASSFileDialogueText *CFASSFileDialogueTextRef;
 
-void CFASSFileDialogueTextDestory(CFASSFileDialogueTextRef dialogueText);
+#pragma mark - Copy/Destory
 
 CFASSFileDialogueTextRef CFASSFileDialogueTextCopy(CFASSFileDialogueTextRef dialogueText);
 
+void CFASSFileDialogueTextDestory(CFASSFileDialogueTextRef dialogueText);
+
 void CFASSFileDialogueTextAddContent(CFASSFileDialogueTextRef dialogueText, CFASSFileDialogueTextContentRef content);
+
+#pragma mark - Receive Change
+
+void CFASSFileDialogueTextMakeChange(CFASSFileDialogueTextRef dialogueText, CFASSFileChangeRef change);
+
+#pragma mark - Get Component
+
+CFEnumeratorRef CFASSFileDialogueTextCreateEnumerator(CFASSFileDialogueTextRef dialogueText);
 
 #endif /* CFASSFileDialogueText_h */

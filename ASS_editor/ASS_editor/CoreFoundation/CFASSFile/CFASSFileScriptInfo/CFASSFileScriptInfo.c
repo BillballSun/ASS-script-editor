@@ -16,8 +16,11 @@
 #include "CFASSFileScriptInfo_Private.h"
 #include "CFUnicodeStringArray.h"
 #include "CFUseTool.h"
+#include "CFException.h"
+#include "CFASSFileChange.h"
+#include "CFASSFileChange_Private.h"
 
-#define CFASSFileScriptInfoSearchEachContentName(WSTR) (L"\n"WSTR":")
+#define CFASSFileScriptInfoSearchEachContentName(WSTR) (L"\n" WSTR L":")
 
 #define CFASSFileScriptInfoFileContentSearchInOrder 1
 
@@ -41,6 +44,17 @@ struct CFASSFileScriptInfo {
     unsigned int wrap_style;        // (optional)0 - 4
     CFASSFileRef registeredFile;    // don't have ownership
 };
+
+void CFASSFileScriptInfoMakeChange(CFASSFileScriptInfoRef scriptInfo, CFASSFileChangeRef change)
+{
+    if(scriptInfo == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileScriptInfo %p MakeChange %p", scriptInfo, change);
+    if(change->type & CFASSFileChangeTypeResolution)
+    {
+        scriptInfo->play_res_x = change->resolution.newSize.x;
+        scriptInfo->play_res_y = change->resolution.newSize.y;
+    }
+}
 
 int CFASSFileScriptInfoRegisterAssociationwithFile(CFASSFileScriptInfoRef scriptInfo, CFASSFileRef assFile)
 {
@@ -691,54 +705,3 @@ void CFASSFileScriptInfoDestory(CFASSFileScriptInfoRef scriptInfo)
     free(scriptInfo->play_depth);
     free(scriptInfo);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

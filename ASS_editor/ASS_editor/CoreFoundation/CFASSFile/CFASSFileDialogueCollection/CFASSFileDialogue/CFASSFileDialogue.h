@@ -9,10 +9,18 @@
 #ifndef CFASSFileDialogue_h
 #define CFASSFileDialogue_h
 
+#include "CFASSFileChange.h"
+
 typedef struct CFASSFileDialogue *CFASSFileDialogueRef;
+
+#pragma mark - Copy/Destory
+
+CFASSFileDialogueRef CFASSFileDialogueCopy(CFASSFileDialogueRef dialogue);
 
 void CFASSFileDialogueDestory(CFASSFileDialogueRef dialogue);
 
-CFASSFileDialogueRef CFASSFileDialogueCopy(CFASSFileDialogueRef dialogue);
+#pragma mark - Receive Change
+
+void CFASSFileDialogueMakeChange(CFASSFileDialogueRef dialogue, CFASSFileChangeRef change);
 
 #endif /* CFASSFileDialogue_h */

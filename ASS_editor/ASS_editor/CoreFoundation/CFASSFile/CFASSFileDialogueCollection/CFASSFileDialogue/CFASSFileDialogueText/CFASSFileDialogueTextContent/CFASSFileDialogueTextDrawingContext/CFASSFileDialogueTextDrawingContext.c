@@ -14,6 +14,7 @@
 #include "CFASSFileDialogueTextDrawingContext.h"
 #include "CFASSFileDialogueTextDrawingContext_Private.h"
 #include "CFPointerArray.h"
+#include "CFException.h"
 
 #pragma mark context
 
@@ -76,6 +77,8 @@ typedef struct CFASSFileDialogueTextDrawingContextBezierContent *CFASSFileDialog
 typedef struct CFASSFileDialogueTextDrawingContextBSplineContent *CFASSFileDialogueTextDrawingContextBSplineContentRef;
 
 typedef struct CFASSFileDialogueTextDrawingContextExtendBSplineContent *CFASSFileDialogueTextDrawingContextExtendBSplineContentRef;
+
+static const wchar_t *CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(const wchar_t *beginPoint, unsigned int elementAmount);
 
 #pragma mark - ContentManagement
 
@@ -241,6 +244,9 @@ wchar_t *CFASSFileDialogueTextDrawingContextAllocateString(CFASSFileDialogueText
             size_t stringLength = 0;
             int temp;
             bool creationSuccess = true;
+            
+            CFASSFileDialogueTextDrawingContextContentType previousType = CFASSFileDialogueTextDrawingContextContentTypeMove;
+            bool previousExtendBSplineAttached = false;
             for(size_t index = 0; index<contentAmount && creationSuccess; index++)
             {
                 content = CFPointerArrayGetPointerAtIndex(context->contentArray, 1);
@@ -254,20 +260,41 @@ wchar_t *CFASSFileDialogueTextDrawingContextAllocateString(CFASSFileDialogueText
                             temp = fwprintf(fp, L"n %d %d ",
                                             ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->x,
                                             ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->y);
+                        previousType = CFASSFileDialogueTextDrawingContextContentTypeMove;
                         break;
                     case CFASSFileDialogueTextDrawingContextContentTypeLine:
-                        temp = fwprintf(fp, L"l %d %d ",
-                                        ((CFASSFileDialogueTextDrawingContextLineContentRef)content->data)->x,
-                                        ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->y);
+                        if(index!=0 && previousType == CFASSFileDialogueTextDrawingContextContentTypeLine)
+                            temp = fwprintf(fp, L"%d %d ",
+                                            ((CFASSFileDialogueTextDrawingContextLineContentRef)content->data)->x,
+                                            ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->y);
+                        else
+                        {
+                            temp = fwprintf(fp, L"l %d %d ",
+                                            ((CFASSFileDialogueTextDrawingContextLineContentRef)content->data)->x,
+                                            ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->y);
+                            previousType = CFASSFileDialogueTextDrawingContextContentTypeLine;
+                        }
                         break;
                     case CFASSFileDialogueTextDrawingContextContentTypeBezier:
-                        temp = fwprintf(fp, L"b %d %d %d %d %d %d ",
-                                        ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x1,
-                                        ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y1,
-                                        ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x2,
-                                        ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y2,
-                                        ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x3,
-                                        ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y3);
+                        if(index!=0 && previousType == CFASSFileDialogueTextDrawingContextContentTypeBezier)
+                            temp = fwprintf(fp, L"%d %d %d %d %d %d ",
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x1,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y1,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x2,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y2,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x3,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y3);
+                        else
+                        {
+                            temp = fwprintf(fp, L"b %d %d %d %d %d %d ",
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x1,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y1,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x2,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y2,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x3,
+                                            ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y3);
+                            previousType = CFASSFileDialogueTextDrawingContextContentTypeBezier;
+                        }
                         break;
                     case CFASSFileDialogueTextDrawingContextContentTypeBSpline:
                         temp = fwprintf(fp, L"b %d %d %d %d %d %d ",
@@ -277,16 +304,30 @@ wchar_t *CFASSFileDialogueTextDrawingContextAllocateString(CFASSFileDialogueText
                                         ((CFASSFileDialogueTextDrawingContextBSplineContentRef)content->data)->y2,
                                         ((CFASSFileDialogueTextDrawingContextBSplineContentRef)content->data)->x3,
                                         ((CFASSFileDialogueTextDrawingContextBSplineContentRef)content->data)->y3);
+                        previousType = CFASSFileDialogueTextDrawingContextContentTypeBSpline;
                         break;
                     case CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline:
                         if(((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->attachToPreviousBSplineContent)
+                        {
                             temp = fwprintf(fp, L"%d %d ",
                                             ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->x,
                                             ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->y);
+                            previousExtendBSplineAttached = true;
+                        }
                         else
-                            temp = fwprintf(fp, L"p %d %d ",
-                                            ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->x,
-                                            ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->y);
+                        {
+                            
+                            if(previousType == CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline && !previousExtendBSplineAttached)
+                                temp = fwprintf(fp, L"%d %d ",
+                                                ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->x,
+                                                ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->y);
+                            else
+                                temp = fwprintf(fp, L"p %d %d ",
+                                                ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->x,
+                                                ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->y);
+                            previousExtendBSplineAttached = false;
+                        }
+                        previousType = CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline;
                         break;
                     case CFASSFileDialogueTextDrawingContextContentTypeCloseBSpline:
                         temp = fwprintf(fp, L"c ");
@@ -304,7 +345,10 @@ wchar_t *CFASSFileDialogueTextDrawingContextAllocateString(CFASSFileDialogueText
                 {
                     wchar_t *beginPoint = result;
                     size_t currentRemainLength = stringLength;
-                    for(size_t index = 0; index<contentAmount; index++)
+                    
+                    previousExtendBSplineAttached = false;
+                    previousType = CFASSFileDialogueTextDrawingContextContentTypeMove;
+                    for(size_t index = 0; index<contentAmount && creationSuccess; index++)
                     {
                         content = CFPointerArrayGetPointerAtIndex(context->contentArray, 1);
                         switch (content->type) {
@@ -317,20 +361,41 @@ wchar_t *CFASSFileDialogueTextDrawingContextAllocateString(CFASSFileDialogueText
                                     temp = swprintf(beginPoint, currentRemainLength+1, L"n %d %d ",
                                                     ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->x,
                                                     ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->y);
+                                previousType = CFASSFileDialogueTextDrawingContextContentTypeMove;
                                 break;
                             case CFASSFileDialogueTextDrawingContextContentTypeLine:
-                                temp = swprintf(beginPoint, currentRemainLength+1, L"l %d %d ",
-                                                ((CFASSFileDialogueTextDrawingContextLineContentRef)content->data)->x,
-                                                ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->y);
+                                if(index!=0 && previousType == CFASSFileDialogueTextDrawingContextContentTypeLine)
+                                    temp = swprintf(beginPoint, currentRemainLength+1, L"%d %d ",
+                                                    ((CFASSFileDialogueTextDrawingContextLineContentRef)content->data)->x,
+                                                    ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->y);
+                                else
+                                {
+                                    temp = swprintf(beginPoint, currentRemainLength+1, L"l %d %d ",
+                                                    ((CFASSFileDialogueTextDrawingContextLineContentRef)content->data)->x,
+                                                    ((CFASSFileDialogueTextDrawingContextMoveContentRef)content->data)->y);
+                                    previousType = CFASSFileDialogueTextDrawingContextContentTypeLine;
+                                }
                                 break;
                             case CFASSFileDialogueTextDrawingContextContentTypeBezier:
-                                temp = swprintf(beginPoint, currentRemainLength+1, L"b %d %d %d %d %d %d ",
-                                                ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x1,
-                                                ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y1,
-                                                ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x2,
-                                                ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y2,
-                                                ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x3,
-                                                ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y3);
+                                if(index!=0 && previousType == CFASSFileDialogueTextDrawingContextContentTypeBezier)
+                                    temp = swprintf(beginPoint, currentRemainLength+1, L"%d %d %d %d %d %d ",
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x1,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y1,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x2,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y2,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x3,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y3);
+                                else
+                                {
+                                    temp = swprintf(beginPoint, currentRemainLength+1, L"b %d %d %d %d %d %d ",
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x1,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y1,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x2,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y2,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->x3,
+                                                    ((CFASSFileDialogueTextDrawingContextBezierContentRef)content->data)->y3);
+                                    previousType = CFASSFileDialogueTextDrawingContextContentTypeBezier;
+                                }
                                 break;
                             case CFASSFileDialogueTextDrawingContextContentTypeBSpline:
                                 temp = swprintf(beginPoint, currentRemainLength+1, L"b %d %d %d %d %d %d ",
@@ -340,16 +405,30 @@ wchar_t *CFASSFileDialogueTextDrawingContextAllocateString(CFASSFileDialogueText
                                                 ((CFASSFileDialogueTextDrawingContextBSplineContentRef)content->data)->y2,
                                                 ((CFASSFileDialogueTextDrawingContextBSplineContentRef)content->data)->x3,
                                                 ((CFASSFileDialogueTextDrawingContextBSplineContentRef)content->data)->y3);
+                                previousType = CFASSFileDialogueTextDrawingContextContentTypeBSpline;
                                 break;
                             case CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline:
                                 if(((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->attachToPreviousBSplineContent)
+                                {
                                     temp = swprintf(beginPoint, currentRemainLength+1, L"%d %d ",
                                                     ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->x,
                                                     ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->y);
+                                    previousExtendBSplineAttached = true;
+                                }
                                 else
-                                    temp = swprintf(beginPoint, currentRemainLength+1, L"p %d %d ",
-                                                    ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->x,
-                                                    ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->y);
+                                {
+                                    
+                                    if(previousType == CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline && !previousExtendBSplineAttached)
+                                        temp = swprintf(beginPoint, currentRemainLength+1, L"%d %d ",
+                                                        ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->x,
+                                                        ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->y);
+                                    else
+                                        temp = swprintf(beginPoint, currentRemainLength+1, L"p %d %d ",
+                                                        ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->x,
+                                                        ((CFASSFileDialogueTextDrawingContextExtendBSplineContentRef)content->data)->y);
+                                    previousExtendBSplineAttached = false;
+                                }
+                                previousType = CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline;
                                 break;
                             case CFASSFileDialogueTextDrawingContextContentTypeCloseBSpline:
                                 temp = swprintf(beginPoint, currentRemainLength+1, L"c ");
@@ -388,53 +467,117 @@ bool CFASSFileDialogueTextDrawingContextCheckValidation(CFASSFileDialogueTextDra
     return true;
 }
 
+CFASSFileDialogueTextDrawingContextRef CFASSFileDialogueTextDrawingContextCreateFromString(const wchar_t *string)
+{
+    if(string == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueTextDrawingContextCreateFromString NULL");
+    if(string == L'\0')
+        return NULL;
+    CFASSFileDialogueTextDrawingContextRef result;
+    if((result = CFASSFileDialogueTextDrawingContextCreate()) != NULL)
+    {
+        const wchar_t *beginPoint = string;
+        int temp1, temp2, temp3, temp4, temp5, temp6;
+        CFASSFileDialogueTextDrawingContextContentType previousType = CFASSFileDialogueTextDrawingContextContentTypeLine;
+        bool firstDrawingCode = true;
+        bool formatCheck = true;
+        while (*beginPoint!=L'\0' && formatCheck) {
+            if(swscanf(beginPoint, L"m %d %d", &temp1, &temp2) == 2)
+            {
+                CFASSFileDialogueTextDrawingContextMoveToPosition(result, temp1, temp2, true);
+                previousType = CFASSFileDialogueTextDrawingContextContentTypeMove;
+                beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 3);
+            }
+            else if(swscanf(beginPoint, L"n %d %d", &temp1, &temp2) == 2)
+            {
+                CFASSFileDialogueTextDrawingContextMoveToPosition(result, temp1, temp2, false);
+                previousType = CFASSFileDialogueTextDrawingContextContentTypeMove;
+                beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 3);
+            }
+            else if(swscanf(beginPoint, L"l %d %d", &temp1, &temp2) == 2)
+            {
+                CFASSFileDialogueTextDrawingContextDrawLine(result, temp1, temp2);
+                previousType = CFASSFileDialogueTextDrawingContextContentTypeLine;
+                beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 3);
+            }
+            else if(swscanf(beginPoint, L"b %d %d %d %d %d %d", &temp1, &temp2, &temp3, &temp4, &temp5, &temp6) == 6)
+            {
+                CFASSFileDialogueTextDrawingContextDrawBezier(result, temp1, temp2, temp3, temp4, temp5, temp6);
+                previousType = CFASSFileDialogueTextDrawingContextContentTypeBezier;
+                beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 7);
+            }
+            else if(swscanf(beginPoint, L"s %d %d %d %d %d %d", &temp1, &temp2, &temp3, &temp4, &temp5, &temp6) == 6)
+            {
+                CFASSFileDialogueTextDrawingContextDrawBSpline(result, temp1, temp2, temp3, temp4, temp5, temp6);
+                previousType = CFASSFileDialogueTextDrawingContextContentTypeBSpline;
+                beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 7);
+            }
+            else if(swscanf(beginPoint, L"p %d %d", &temp1, &temp2) == 2)
+            {
+                CFASSFileDialogueTextDrawingContextExtendBSpline(result, temp1, temp2, false);
+                previousType = CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline;
+                beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 3);
+            }
+            else if(!firstDrawingCode)
+            {
+                if(previousType == CFASSFileDialogueTextDrawingContextContentTypeLine &&
+                   swscanf(beginPoint, L"%d %d", &temp1, &temp2) == 2)
+                {
+                    CFASSFileDialogueTextDrawingContextDrawLine(result, temp1, temp2);
+                    previousType = CFASSFileDialogueTextDrawingContextContentTypeLine;
+                    beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 2);
+                }
+                else if(previousType == CFASSFileDialogueTextDrawingContextContentTypeBezier &&
+                        swscanf(beginPoint, L"%d %d %d %d %d %d", &temp1, &temp2, &temp3, &temp4, &temp5, &temp6) == 6)
+                {
+                    CFASSFileDialogueTextDrawingContextDrawBezier(result, temp1, temp2, temp3, temp4, temp5, temp6);
+                    previousType = CFASSFileDialogueTextDrawingContextContentTypeBezier;
+                    beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 6);
+                }
+                else if(previousType == CFASSFileDialogueTextDrawingContextContentTypeBSpline &&
+                        swscanf(beginPoint, L"%d %d", &temp1, &temp2) == 2)
+                {
+                    CFASSFileDialogueTextDrawingContextExtendBSpline(result, temp1, temp2, true);
+                    previousType = CFASSFileDialogueTextDrawingContextContentTypeBSpline;
+                    beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 2);
+                }
+                else if(previousType == CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline &&
+                        swscanf(beginPoint, L"%d %d", &temp1, &temp2) == 2)
+                {
+                    CFASSFileDialogueTextDrawingContextExtendBSpline(result, temp1, temp2, false);
+                    previousType = CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline;
+                    beginPoint = CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(beginPoint, 2);
+                }
+                else
+                    formatCheck = false;
+            }
+            else
+                formatCheck = false;
+            if(firstDrawingCode && previousType!=CFASSFileDialogueTextDrawingContextContentTypeMove)
+                formatCheck = false;
+            firstDrawingCode = false;
+        }
+        if(formatCheck)
+            return result;
+        CFASSFileDialogueTextDrawingContextDestory(result);
+    }
+    return NULL;
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+static const wchar_t *CFASSFileDialogueTextDrawingContextCreateFromStringSkipElement(const wchar_t *beginPoint, unsigned int elementAmount)
+{
+    if(beginPoint == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueTextDrawingContextCreateFromString NULL SkipElement");
+    const wchar_t *search;
+    const wchar_t *unfoundResult = beginPoint + wcslen(beginPoint);
+    for(unsigned int count = 1; count<=elementAmount; count++)
+    {
+        search = wcschr(beginPoint, L' ');
+        if(search == NULL)
+            return unfoundResult;
+        beginPoint = search;
+        while(*beginPoint==L' ') beginPoint++;
+        /* if now beginPoint is '\0', it is OK */
+    }
+    return beginPoint;
+}

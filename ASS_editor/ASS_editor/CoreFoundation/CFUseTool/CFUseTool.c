@@ -9,9 +9,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <string.h>
 
 #include "CFUseTool.h"
 #include "CFException.h"
+
+CFUSize CFUSizeMake(unsigned int x, unsigned int y)
+{
+    return (CFUSize){x, y};
+}
+
+CFSize CFSizeMake(int x, int y)
+{
+    return (CFSize){x, y};
+}
 
 const wchar_t *CF_wcsstr_with_end_point(const wchar_t *sourceString, const wchar_t *findString, const wchar_t *endPoint)
 {
@@ -225,26 +236,71 @@ wchar_t *CF_Dump_mbs_to_wcs(const char *mbs)
     return NULL;
 }
 
+CFTextEncoding CF_check_text_encoding(const char *string)
+{
+    if(string == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CF check text NULL encoding");
+    if(memcmp(string, "\xEF\xBB\xBF", 3) == 0)
+        return CFTextEncodingUTF8;
+    if(memcmp(string, "\x00\x00\xFE\xFF", 4) == 0)
+        return CFTextEncodingUTF32BE;
+    if(memcmp(string, "\xFF\xFE\x00\x00", 4) == 0)
+        return CFTextEncodingUTF32LE;
+    if(memcmp(string, "\xFE\xFF", 2) == 0)
+        return CFTextEncodingUTF16BE;
+    if(memcmp(string, "\xFF\xFE", 2) == 0)
+        return CFTextEncodingUTF16LE;
+    return CFTextEncodingUnkown;
+}
 
+int CF_find_line_number_in_wchar_text(const wchar_t *text, const wchar_t *line)
+{
+    if(text == NULL || line == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CF find line %p number in wchar text %p", line, text);
+    int currentLine = 1;
+    bool checkPoint = true;
+    do
+    {
+        if(text == line)
+            return currentLine;
+        if(*text == L'\0')
+            checkPoint = false;
+        else if(*text == L'\n')
+            currentLine++;
+        text++;
+    }while (checkPoint);
+    return -1;
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+wchar_t *CF_allocate_text_translation_from_winStyle_to_unixStyle(const wchar_t *winText)
+{
+    if(winText == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CF allocate text NULL translation from winStyle to unixStyle");
+    size_t stringLength = 0;
+    const wchar_t *current = winText;
+    while(*current!=L'\0')
+    {
+        if(current[0]==L'\r' && current[1]==L'\n')
+            current++;
+        current++;
+        stringLength++;
+    }
+    wchar_t *result;
+    if((result = malloc(sizeof(wchar_t) * (stringLength+1))) != NULL)
+    {
+        current = winText;
+        size_t index = 0;
+        while(*current!=L'\0')
+        {
+            if(current[0]==L'\r' && current[1]==L'\n')
+                current++;
+            result[index++] = *current++;
+        }
+        result[index] = L'\0';
+        return result;
+    }
+    return NULL;
+}
 
 
 

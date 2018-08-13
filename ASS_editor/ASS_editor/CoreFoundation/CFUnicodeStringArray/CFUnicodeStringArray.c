@@ -27,14 +27,14 @@ CFUnicodeStringArrayRef CFUnicodeStringArrayCopy(CFUnicodeStringArrayRef array)
         return NULL;
     }
     CFUnicodeStringArrayRef result;
-    wchar_t *eachString;
+    const wchar_t *eachString;
     if((result = CFUnicodeStringArrayCreateEmpty()) != NULL)
     {
         size_t arrayLength = CFUnicodeStringArrayGetLength(array);
         bool copyCheck = true;
         for(size_t index = 0; index<arrayLength && copyCheck; index++)
-            if((eachString = CF_Dump_wchar_string(CFUnicodeStringArrayGetStringAtIndex(array, index))) != NULL)
-                CFUnicodeStringArrayAddString(result, eachString);
+            if((eachString = CFUnicodeStringArrayGetStringAtIndex(array, index)) != NULL)
+                CFUnicodeStringArrayAddString(result, eachString, false);    /* Not dumped */
             else
                 copyCheck = false;
         if(copyCheck)
@@ -66,7 +66,7 @@ size_t CFUnicodeStringArrayGetLength(CFUnicodeStringArrayRef array)
     return CFPointerArrayGetLength(array->stringArray);
 }
 
-size_t CFUnicodeStringArrayAddString(CFUnicodeStringArrayRef array, const wchar_t * restrict string)
+size_t CFUnicodeStringArrayAddString(CFUnicodeStringArrayRef array, const wchar_t * string, bool transferOwnership)
 {
     if(array == NULL)
     {
@@ -79,12 +79,20 @@ size_t CFUnicodeStringArrayAddString(CFUnicodeStringArrayRef array, const wchar_
         return (size_t)-1;
     }
     size_t stringLength = wcslen(string);
-    wchar_t *copyedString;
-    if((copyedString = malloc(sizeof(wchar_t)*(stringLength+1))) != NULL)
+    if(transferOwnership)
     {
-        wcscpy(copyedString, string);
-        CFPointerArrayAddPointer(array->stringArray, copyedString, true);
+        CFPointerArrayAddPointer(array->stringArray, (void *)string, true);
         return stringLength;
+    }
+    else
+    {
+        wchar_t *copyedString;
+        if((copyedString = malloc(sizeof(wchar_t)*(stringLength+1))) != NULL)
+        {
+            wcscpy(copyedString, string);
+            CFPointerArrayAddPointer(array->stringArray, copyedString, true);
+            return stringLength;
+        }
     }
     return (size_t)-1;
 }
@@ -99,7 +107,7 @@ void CFUnicodeStringArrayRemoveStringAtIndex(CFUnicodeStringArrayRef array, size
     CFPointerArrayRemovePointerAtIndex(array->stringArray, index, false);
 }
 
-size_t CFUnicodeStringArrayInsertStringAtIndex(CFUnicodeStringArrayRef array, const wchar_t * restrict string, size_t index)
+size_t CFUnicodeStringArrayInsertStringAtIndex(CFUnicodeStringArrayRef array, const wchar_t *string, size_t index)
 {
     if(array == NULL)
     {
@@ -132,7 +140,7 @@ void CFUnicodeStringArraySwapStringPosition(CFUnicodeStringArrayRef array, size_
     CFPointerArraySwapPointerPosition(array->stringArray, index1, index2);
 }
 
-size_t CFUnicodeStringArrayAddStringWithEndChar(CFUnicodeStringArrayRef array, const wchar_t * restrict string, const wchar_t endChar, bool *encounterEndChar)
+size_t CFUnicodeStringArrayAddStringWithEndChar(CFUnicodeStringArrayRef array, const wchar_t *string, const wchar_t endChar, bool *encounterEndChar)
 {
     if(array == NULL)
     {

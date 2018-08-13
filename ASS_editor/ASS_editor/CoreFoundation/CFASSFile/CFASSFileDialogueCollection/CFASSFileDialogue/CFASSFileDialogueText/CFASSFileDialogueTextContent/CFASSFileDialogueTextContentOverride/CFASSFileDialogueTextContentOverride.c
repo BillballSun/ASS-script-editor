@@ -16,11 +16,32 @@
 #include "CFASSFileDialogueTextContentOverrideContent_Private.h"
 #include "CFUseTool.h"
 #include "CFException.h"
+#include "CFEnumerator.h"
+#include "CFASSFileChange.h"
+#include "CFASSFileChange_Private.h"
 
 struct CFASSFileDialogueTextContentOverride
 {
     CFPointerArrayRef contentArray;
 };
+
+void CFASSFileDialogueTextContentOverrideMakeChange(CFASSFileDialogueTextContentOverrideRef override, CFASSFileChangeRef change)
+{
+    if(override == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueTextContentOverride %p MakeChange %p", override, change);
+    CFEnumeratorRef enumerator = CFASSFileDialogueTextContentOverrideCreateEnumerator(override);
+    CFASSFileDialogueTextContentOverrideContentRef eachContent;
+    while((eachContent = CFEnumeratorNextObject(enumerator)) != NULL)
+        CFASSFileDialogueTextContentOverrideContentMakeChange(eachContent, change);
+    CFEnumeratorDestory(enumerator);
+}
+
+CFEnumeratorRef CFASSFileDialogueTextContentOverrideCreateEnumerator(CFASSFileDialogueTextContentOverrideRef override)
+{
+    if(override == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueTextContentOverride NULL CreateEnumerator");
+    return CFEnumeratorCreateFromArray(override->contentArray);
+}
 
 CFASSFileDialogueTextContentOverrideRef CFASSFileDialogueTextContentOverrideCreateWithContent(CFASSFileDialogueTextContentOverrideContentRef content)
 {
@@ -202,10 +223,7 @@ CFASSFileDialogueTextContentOverrideRef CFASSFileDialogueTextContentOverrideCrea
                         if((content = CFASSFileDialogueTextContentOverrideContentCreateWithString(tokenBegin, tokenEnd))!=NULL)
                             CFPointerArrayAddPointer(result->contentArray, content, false);
                         else
-                        {
                             formatCheck = false;
-                            CFASSFileDialogueTextContentOverrideContentCreateWithString(tokenBegin, tokenEnd);
-                        }
                         tokenBegin = tokenEnd + 1;
                     }
                 }while(formatCheck && tokenEnd<endPoint);
@@ -222,54 +240,3 @@ CFASSFileDialogueTextContentOverrideRef CFASSFileDialogueTextContentOverrideCrea
     }
     return NULL;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

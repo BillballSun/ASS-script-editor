@@ -13,9 +13,15 @@
 
 #include "CFASSFileDialogueCollection.h"
 
+#pragma mark - Read File
+
 CFASSFileDialogueCollectionRef CFASSFileDialogueCollectionCreateWithUnicodeFileContent(const wchar_t *content);
 
+#pragma mark - Allocate Result
+
 wchar_t *CFASSFileDialogueCollectionAllocateFileContent(CFASSFileDialogueCollectionRef dialogueCollection);
+
+#pragma mark - Register Callbacks
 
 int CFASSFileDialogueCollectionRegisterAssociationwithFile(CFASSFileDialogueCollectionRef collection, CFASSFileRef assFile);
 /* Return */

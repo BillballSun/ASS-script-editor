@@ -13,10 +13,14 @@
 
 #include "CFASSFileDialogueTextContentOverrideContent.h"
 
+#pragma mark - Read File
+
 CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverrideContentCreateWithString(const wchar_t *contentString, const wchar_t *endPoint);
 /* endPoint */
 // points to the last possible content, this could be NULL
 // for example, \move (1, 1), then the endPoint points to ')' is correct
+
+#pragma mark - Store Result
 
 int CFASSFileDialogueTextContentOverrideContentStoreStringResult(CFASSFileDialogueTextContentOverrideContentRef overrideContent, wchar_t * targetPoint);
 /* targetPoint */

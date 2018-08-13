@@ -12,11 +12,16 @@
 #include <wchar.h>
 
 #include "CFASSFileScriptInfo.h"
-#include "CFASSFile.h"
+
+#pragma mark - Read File
 
 CFASSFileScriptInfoRef CFASSFileScriptInfoCreateWithUnicodeFileContent(const wchar_t *content);
 
+#pragma mark - Allocate Result
+
 wchar_t *CFASSFileScriptInfoAllocateFileContent(CFASSFileScriptInfoRef scriptInfo);
+
+#pragma mark - Register Callbacks
 
 int CFASSFileScriptInfoRegisterAssociationwithFile(CFASSFileScriptInfoRef scriptInfo, CFASSFileRef assFile);
 /* Return */

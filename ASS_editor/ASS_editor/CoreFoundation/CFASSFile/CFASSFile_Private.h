@@ -13,6 +13,17 @@
 #include "CFASSFileScriptInfo.h"
 #include "CFASSFileStyleCollection.h"
 #include "CFUseTool.h"
+#include "CFDef.h"
+
+#pragma mark - Get component
+
+CFASSFileScriptInfoRef CFASSFileGetScriptInfo(CFASSFileRef file);
+
+CFASSFileStyleCollectionRef CFASSFileGetStyleCollection(CFASSFileRef file);
+
+CFASSFileDialogueCollectionRef CFASSFileGetDialogueCollection(CFASSFileRef file);
+
+#pragma mark - Receive Callbacks
 
 void CFASSFileReceiveResolutionXYChangeFromScriptInfo(CFASSFileRef file, CFUSize from, CFUSize to);
 

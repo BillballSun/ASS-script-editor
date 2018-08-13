@@ -10,9 +10,13 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <wctype.h>
+#include <limits.h>
 
 #include "CFASSFileStyle.h"
 #include "CFASSFile_Private.h"
+#include "CFException.h"
+#include "CFASSFileChange.h"
+#include "CFASSFileChange_Private.h"
 
 #define CFASSFileStyleCreateWithStringScanBySteps 0
 
@@ -27,7 +31,7 @@ struct CFASSFileStyle
                         back_colour;
     bool blod, italic, underline, strike_out;   // -1 for true, 0 for false
     double scale_x, scale_y;                    // percentage, without digitpoint
-    unsigned int spacing;                       // extra spacing between characters, in pixels
+    double spacing;                             // extra spacing between characters, in pixels, may be negative and has decimalPoints
     double angle;                               // the origin is defined be alignment
     int border_style;                           // 1 = outline+drop shadow, 3 = opaque box
     unsigned int outline;                       // if BorderStyle is 1, this specify width of ouline around text in pixels
@@ -41,6 +45,58 @@ struct CFASSFileStyle
 };
 
 static bool CFASSFileStyleCreateWithStringIsSkip(wchar_t input);
+
+void CFASSFileStyleMakeChange(CFASSFileStyleRef style, CFASSFileChangeRef change)
+{
+    if(style == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileStyle %p MakeChange %p", style, change);
+    if(change->type & CFASSFileChangeTypeFontSize)
+    {
+        if(change->fontSize.byPercentage)
+            style->font_size *= change->fontSize.percentage;
+        else
+            style->font_size = change->fontSize.fontSize;
+    }
+    if(change->type & CFASSFileChangeTypeFontName)
+    {
+        wchar_t *dumped = CF_Dump_wchar_string(change->fontName.fontName);
+        if(dumped != NULL)
+        {
+            free(style->font_name);
+            style->font_name = dumped;
+        }
+    }
+    if(change->type & CFASSFileChangeTypePrimaryColor)
+    {
+        style->primary_colour = CFASSFileStyleColorMake(change->primaryColor.alpha, change->primaryColor.blue, change->primaryColor.green, change->primaryColor.red);
+    }
+    if(change->type & CFASSFileChangeTypeOutlineColor)
+    {
+        style->outline_colour = CFASSFileStyleColorMake(change->outlineColor.alpha, change->outlineColor.blue, change->outlineColor.green, change->outlineColor.red);
+    }
+    if(change->type & CFASSFileChangeTypeBlod)
+    {
+        style->blod = change->blod.isBlod;
+    }
+    if(change->type & CFASSFileChangeTypeBorderStyle)
+    {
+        style->border_style = change->borderStyle.borderStyle;
+    }
+    if(change->type & CFASSFileChangeTypeShadow)
+    {
+        if(change->shadow.forceBorderStyle)
+            style->border_style = 1;
+        if(style->border_style == 1)
+            style->shadow = change->shadow.pixel;
+    }
+    if(change->type & CFASSFileChangeTypeOutline)
+    {
+        if(change->outline.forceBorderStyle)
+            style->border_style = 1;
+        if(style->border_style == 1)
+            style->outline = change->outline.pixel;
+    }
+}
 
 CFASSFileStyleRef CFASSFileStyleCopy(CFASSFileStyleRef style)
 {
@@ -96,7 +152,7 @@ CFASSFileStyleRef CFASSFileStyleCreate(wchar_t *name,
                                        CFASSFileStyleColor outline_colour,
                                        bool blod, bool italic, bool underline, bool strike_out,
                                        double scale_x, double scale_y,
-                                       unsigned int spacing,
+                                       double spacing,
                                        double angle,
                                        int border_style,
                                        unsigned int outline, unsigned int shadow,
@@ -163,7 +219,7 @@ wchar_t *CFASSFileStyleAllocateFileContent(CFASSFileStyleRef style)
              L"&H%2.2hX%2.2hX%2.2hX%2.2hX,"
              L"%d,%d,%d,%d,"                        /* blod, italic, underline, strike_out */
              L"%g,%g,"                              /* scale_x, scale_y */
-             L"%u,"                                 /* spacing */
+             L"%g,"                                 /* spacing */
              L"%g,"                                 /* angle */
              L"%d,"                                 /* border_style */
              L"%u,%u,"                              /* outline, shadow */
@@ -196,7 +252,7 @@ wchar_t *CFASSFileStyleAllocateFileContent(CFASSFileStyleRef style)
                  L"&H%2.2hX%2.2hX%2.2hX%2.2hX,"
                  L"%d,%d,%d,%d,"                        /* blod, italic, underline, strike_out */
                  L"%g,%g,"                              /* scale_x, scale_y */
-                 L"%u,"                                 /* spacing */
+                 L"%g,"                                 /* spacing */
                  L"%g,"                                 /* angle */
                  L"%d,"                                 /* border_style */
                  L"%u,%u,"                              /* outline, shadow */
@@ -228,8 +284,7 @@ CFASSFileStyleRef CFASSFileStyleCreateWithString(const wchar_t *content)
     const wchar_t *beginPoint = content,
                   *endPoint = content;          /* points to L'\n' */
     while(*endPoint!=L'\n') endPoint++;
-    
-    int scanedAmount = 0;
+    int scanedAmount = (int)wcslen(L"Style:");
     swscanf(beginPoint, L"Style:%n", &scanedAmount);
     if(scanedAmount == wcslen(L"Style:"))
     {
@@ -382,7 +437,7 @@ CFASSFileStyleRef CFASSFileStyleCreateWithString(const wchar_t *content)
                         if(*beginPoint == L',') beginPoint++;
                         else goto LABEL_1;
                         
-                        if(swscanf(beginPoint, L"%u%n", &result->spacing, &scanedAmount) != 1) goto LABEL_1;
+                        if(swscanf(beginPoint, L"%lf%n", &result->spacing, &scanedAmount) != 1) goto LABEL_1;
                         beginPoint += scanedAmount;
                         while(*beginPoint!=L',' && beginPoint<endPoint) beginPoint++;
                         if(*beginPoint == L',') beginPoint++;
@@ -469,7 +524,7 @@ CFASSFileStyleRef CFASSFileStyleCreateWithString(const wchar_t *content)
                                        L"&H%2hX%2hX%2hX%2hX,&H%2hX%2hX%2hX%2hX,&H%2hX%2hX%2hX%2hX,&H%2hX%2hX%2hX%2hX,"
                                        L"%d,%d,%d,%d,"      /* blod, italic, underline, strike_out */
                                        L"%lf,%lf,"          /* scale_x, scale_y */
-                                       L"%u,"               /* spacing */
+                                       L"%lf,"               /* spacing */
                                        L"%lf,"              /* angle */
                                        L"%d,"               /* boarder_style */
                                        L"%u,%u,"            /* outline, shadow */
@@ -527,7 +582,6 @@ CFASSFileStyleRef CFASSFileStyleCreateWithString(const wchar_t *content)
                                 if(isFormatCorrect) return result;
                             }
                         }
-                        
                         free(result->font_name);
                         
                         #endif
@@ -557,54 +611,3 @@ CFASSFileStyleColor CFASSFileStyleColorMake(unsigned char alpha,
 {
     return (CFASSFileStyleColor){alpha, blue, green, red};
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

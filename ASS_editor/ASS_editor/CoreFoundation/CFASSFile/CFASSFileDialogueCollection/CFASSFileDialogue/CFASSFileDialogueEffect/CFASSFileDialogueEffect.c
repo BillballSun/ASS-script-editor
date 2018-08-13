@@ -15,6 +15,9 @@
 #include "CFASSFileDialogueEffect.h"
 #include "CFASSFileDialogueEffect_Private.h"
 #include "CFUseTool.h"
+#include "CFASSFileChange.h"
+#include "CFASSFileChange_Private.h"
+#include "CFException.h"
 
 typedef enum CFASSFileDialogueEffectType
 {
@@ -45,6 +48,12 @@ struct CFASSFileDialogueEffect {
         }banner;
     }data;
 };
+
+void CFASSFileDialogueEffectMakeChange(CFASSFileDialogueEffectRef effect, CFASSFileChangeRef change)
+{
+    if(effect == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueEffect %p MakeChange %p", effect, change);
+}
 
 CFASSFileDialogueEffectRef CFASSFileDialogueEffectCopy(CFASSFileDialogueEffectRef effect)
 {

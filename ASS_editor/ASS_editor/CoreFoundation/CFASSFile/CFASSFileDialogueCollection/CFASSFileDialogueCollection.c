@@ -16,12 +16,27 @@
 #include "CFASSFileDialogue.h"
 #include "CFASSFileDialogue_Private.h"
 #include "CFPointerArray.h"
+#include "CFEnumerator.h"
+#include "CFException.h"
+#include "CFASSFileControl.h"
+#include "CFASSFileControl_Private.h"
 
 struct CFASSFileDialogueCollection
 {
     CFPointerArrayRef collectionArray;
     CFASSFileRef registeredFile;
 };
+
+void CFASSFileDialogueCollectionMakeChange(CFASSFileDialogueCollectionRef dialogueCollection, CFASSFileChangeRef change)
+{
+    if(dialogueCollection == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueCollection %p MakeChange %p", dialogueCollection, change);
+    CFEnumeratorRef enumerator = CFASSFileDialogueCollectionCreateEnumerator(dialogueCollection);
+    CFASSFileDialogueRef eachDialogue;
+    while ((eachDialogue = CFEnumeratorNextObject(enumerator)) != NULL)
+        CFASSFileDialogueMakeChange(eachDialogue, change);
+    CFEnumeratorDestory(enumerator);
+}
 
 CFASSFileDialogueCollectionRef CFASSFileDialogueCollectionCopy(CFASSFileDialogueCollectionRef dialogueCollection)
 {
@@ -54,6 +69,13 @@ CFASSFileDialogueCollectionRef CFASSFileDialogueCollectionCopy(CFASSFileDialogue
         free(result);
     }
     return NULL;
+}
+
+CFEnumeratorRef CFASSFileDialogueCollectionCreateEnumerator(CFASSFileDialogueCollectionRef dialogueCollection)
+{
+    if(dialogueCollection == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueCollection NULL CreateEnumerator");
+    return CFEnumeratorCreateFromArray(dialogueCollection->collectionArray);
 }
 
 void CFASSFileDialogueCollectionDestory(CFASSFileDialogueCollectionRef dialogueCollection)
@@ -94,11 +116,19 @@ CFASSFileDialogueCollectionRef CFASSFileDialogueCollectionCreateWithUnicodeFileC
                 size_t skipLength = wcslen(L"\nDialogue:");
                 CFASSFileDialogueRef eachDialogue;
                 bool formatCheck = true;
-                while((searchPoint = wcsstr(searchPoint, L"\nDialogue:")) != NULL && formatCheck)
+                while(formatCheck && (searchPoint = wcsstr(searchPoint, L"\nDialogue:")) != NULL)
                 {
                     eachDialogue = CFASSFileDialogueCreateWithString(searchPoint+1);
                     if(eachDialogue == NULL)
-                        formatCheck = false;
+                    {
+                        CFASSFileControlErrorHandling errorHandle = CFASSFileControlGetErrorHandling();
+                        if(!(errorHandle & CFASSFileControlErrorHandlingIgnore))
+                            formatCheck = false;
+                        else
+                            searchPoint += skipLength;
+                        if(errorHandle & CFASSFileControlErrorHandlingOutput)
+                            CFASSFileControlErrorOutput(content, searchPoint+1);
+                    }
                     else
                     {
                         CFPointerArrayAddPointer(result->collectionArray, eachDialogue, false);
@@ -154,55 +184,3 @@ wchar_t *CFASSFileDialogueCollectionAllocateFileContent(CFASSFileDialogueCollect
     }
     return NULL;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

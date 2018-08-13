@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		F82B7F2620A0E961006A58C0 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F2520A0E961006A58C0 /* main.m */; };
+		F842314C20C70F840019810F /* CFEnumerator.c in Sources */ = {isa = PBXBuildFile; fileRef = F842314B20C70F840019810F /* CFEnumerator.c */; };
+		F842315220C7BF170019810F /* CFASSFileChange.c in Sources */ = {isa = PBXBuildFile; fileRef = F842315120C7BF170019810F /* CFASSFileChange.c */; };
 		F859E4CC20A346DA003AACF4 /* CFAssert.h in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F5820A0FB57006A58C0 /* CFAssert.h */; };
 		F859E4CD20A346DA003AACF4 /* CFTextProvider.h in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F5420A0F6AF006A58C0 /* CFTextProvider.h */; };
 		F859E4CE20A346DA003AACF4 /* CFTextProvider_Private.h in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F5720A0F7C5006A58C0 /* CFTextProvider_Private.h */; };
@@ -21,7 +23,7 @@
 		F859E4D620A346DA003AACF4 /* CFASSFileScriptInfo_Private.h in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F5920A165C2006A58C0 /* CFASSFileScriptInfo_Private.h */; };
 		F859E4D720A346DA003AACF4 /* CFASSFileScriptInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F4920A0F087006A58C0 /* CFASSFileScriptInfo.c */; };
 		F859E4D820A346DA003AACF4 /* CFASSFileStyleCollection.h in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F4B20A0F13E006A58C0 /* CFASSFileStyleCollection.h */; };
-		F859E4D920A346DA003AACF4 /* CFASSFileStleCollection_Private.h in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F5A20A16655006A58C0 /* CFASSFileStleCollection_Private.h */; };
+		F859E4D920A346DA003AACF4 /* CFASSFileStyleCollection_Private.h in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F5A20A16655006A58C0 /* CFASSFileStyleCollection_Private.h */; };
 		F859E4DA20A346DA003AACF4 /* CFASSFileStyleCollection.c in Sources */ = {isa = PBXBuildFile; fileRef = F82B7F4C20A0F13E006A58C0 /* CFASSFileStyleCollection.c */; };
 		F859E4DB20A346DA003AACF4 /* CFASSFileStyle.h in Sources */ = {isa = PBXBuildFile; fileRef = F86A7BA220A216F80021E6EE /* CFASSFileStyle.h */; };
 		F859E4DC20A346DA003AACF4 /* CFASSFileStyle_Private.h in Sources */ = {isa = PBXBuildFile; fileRef = F86A7BA520A220A50021E6EE /* CFASSFileStyle_Private.h */; };
@@ -37,6 +39,8 @@
 		F859E4EE20A447AF003AACF4 /* CFASSFileDialogueText.c in Sources */ = {isa = PBXBuildFile; fileRef = F859E4ED20A447AF003AACF4 /* CFASSFileDialogueText.c */; };
 		F859E4F120A4481C003AACF4 /* CFASSFileDialogueTextContentOverride.c in Sources */ = {isa = PBXBuildFile; fileRef = F859E4F020A4481C003AACF4 /* CFASSFileDialogueTextContentOverride.c */; };
 		F859E4F620A55154003AACF4 /* CFASSFileDialogueTextContent.c in Sources */ = {isa = PBXBuildFile; fileRef = F859E4F520A55154003AACF4 /* CFASSFileDialogueTextContent.c */; };
+		F866831520C88E2F00767276 /* CFASSFileControl.c in Sources */ = {isa = PBXBuildFile; fileRef = F866831420C88E2F00767276 /* CFASSFileControl.c */; };
+		F866831C20C8FC6800767276 /* CFCrossPlatform.c in Sources */ = {isa = PBXBuildFile; fileRef = F866831B20C8FC6800767276 /* CFCrossPlatform.c */; };
 		F8878D7E20A5837C00C48FE0 /* CFASSFileDialogueTextContentOverrideContent.c in Sources */ = {isa = PBXBuildFile; fileRef = F8878D7D20A5837C00C48FE0 /* CFASSFileDialogueTextContentOverrideContent.c */; };
 		F8B3071420A846AC00226FD0 /* CFASSFileDialogueTextDrawingContext.c in Sources */ = {isa = PBXBuildFile; fileRef = F8B3071320A846AC00226FD0 /* CFASSFileDialogueTextDrawingContext.c */; };
 		F8BF190B20A6A2DD00CB876A /* CFDef.h in Sources */ = {isa = PBXBuildFile; fileRef = F8BF190A20A6A22200CB876A /* CFDef.h */; };
@@ -45,7 +49,7 @@
 		F8BF190E20A6A2E700CB876A /* CFASSFileDialogueTextContentOverride.h in Sources */ = {isa = PBXBuildFile; fileRef = F859E4EF20A4481C003AACF4 /* CFASSFileDialogueTextContentOverride.h */; };
 		F8BF190F20A6A2E700CB876A /* CFASSFileDialogueTextContentOverride_Private.h in Sources */ = {isa = PBXBuildFile; fileRef = F859E4F320A4AA40003AACF4 /* CFASSFileDialogueTextContentOverride_Private.h */; };
 		F8BF191020A6A2E700CB876A /* CFASSFileDialogueTextContent.h in Sources */ = {isa = PBXBuildFile; fileRef = F859E4F420A55154003AACF4 /* CFASSFileDialogueTextContent.h */; };
-		F8BF191120A6A2E700CB876A /* CFASSFileDialogueTextContent_Prvivate.h in Sources */ = {isa = PBXBuildFile; fileRef = F859E4F720A5526A003AACF4 /* CFASSFileDialogueTextContent_Prvivate.h */; };
+		F8BF191120A6A2E700CB876A /* CFASSFileDialogueTextContent_Private.h in Sources */ = {isa = PBXBuildFile; fileRef = F859E4F720A5526A003AACF4 /* CFASSFileDialogueTextContent_Private.h */; };
 		F8BF191220A6A2E700CB876A /* CFASSFileDialogueText.h in Sources */ = {isa = PBXBuildFile; fileRef = F859E4EC20A447AF003AACF4 /* CFASSFileDialogueText.h */; };
 		F8BF191320A6A2E700CB876A /* CFASSFileDialogueText_Private.h in Sources */ = {isa = PBXBuildFile; fileRef = F859E4F220A4A8FF003AACF4 /* CFASSFileDialogueText_Private.h */; };
 		F8BF191420A6A2E700CB876A /* CFASSFileDialogueEffect.h in Sources */ = {isa = PBXBuildFile; fileRef = F859E4E920A442B7003AACF4 /* CFASSFileDialogueEffect.h */; };
@@ -81,12 +85,21 @@
 		F82B7F5720A0F7C5006A58C0 /* CFTextProvider_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFTextProvider_Private.h; sourceTree = "<group>"; };
 		F82B7F5820A0FB57006A58C0 /* CFAssert.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFAssert.h; sourceTree = "<group>"; };
 		F82B7F5920A165C2006A58C0 /* CFASSFileScriptInfo_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileScriptInfo_Private.h; sourceTree = "<group>"; };
-		F82B7F5A20A16655006A58C0 /* CFASSFileStleCollection_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileStleCollection_Private.h; sourceTree = "<group>"; };
+		F82B7F5A20A16655006A58C0 /* CFASSFileStyleCollection_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileStyleCollection_Private.h; sourceTree = "<group>"; };
 		F82B7F5B20A166F4006A58C0 /* CFASSFileDialogueCollection_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogueCollection_Private.h; sourceTree = "<group>"; };
 		F82B7F5F20A180C4006A58C0 /* CFUnicodeStringArray.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFUnicodeStringArray.h; sourceTree = "<group>"; };
 		F82B7F6020A180C4006A58C0 /* CFUnicodeStringArray.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFUnicodeStringArray.c; sourceTree = "<group>"; };
 		F82B7F6220A18FEE006A58C0 /* CFUseTool.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFUseTool.h; sourceTree = "<group>"; };
 		F82B7F6320A18FEE006A58C0 /* CFUseTool.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFUseTool.c; sourceTree = "<group>"; };
+		F842314520C6BCDB0019810F /* CFPlatform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFPlatform.h; sourceTree = "<group>"; };
+		F842314620C703150019810F /* CFASSFileKit.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileKit.h; sourceTree = "<group>"; };
+		F842314A20C70F840019810F /* CFEnumerator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFEnumerator.h; sourceTree = "<group>"; };
+		F842314B20C70F840019810F /* CFEnumerator.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFEnumerator.c; sourceTree = "<group>"; };
+		F842314D20C711A30019810F /* CFEnumerator_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFEnumerator_Private.h; sourceTree = "<group>"; };
+		F842314E20C71A2A0019810F /* CFPointerArray_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFPointerArray_Private.h; sourceTree = "<group>"; };
+		F842315020C7BF170019810F /* CFASSFileChange.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileChange.h; sourceTree = "<group>"; };
+		F842315120C7BF170019810F /* CFASSFileChange.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFASSFileChange.c; sourceTree = "<group>"; };
+		F842315720C7C1D00019810F /* CFASSFileChange_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileChange_Private.h; sourceTree = "<group>"; };
 		F859E4E320A411BE003AACF4 /* CFPointerArray.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFPointerArray.h; sourceTree = "<group>"; };
 		F859E4E420A411BE003AACF4 /* CFPointerArray.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFPointerArray.c; sourceTree = "<group>"; };
 		F859E4E620A4422F003AACF4 /* CFASSFileDialogue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogue.h; sourceTree = "<group>"; };
@@ -101,7 +114,12 @@
 		F859E4F320A4AA40003AACF4 /* CFASSFileDialogueTextContentOverride_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogueTextContentOverride_Private.h; sourceTree = "<group>"; };
 		F859E4F420A55154003AACF4 /* CFASSFileDialogueTextContent.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogueTextContent.h; sourceTree = "<group>"; };
 		F859E4F520A55154003AACF4 /* CFASSFileDialogueTextContent.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFASSFileDialogueTextContent.c; sourceTree = "<group>"; };
-		F859E4F720A5526A003AACF4 /* CFASSFileDialogueTextContent_Prvivate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogueTextContent_Prvivate.h; sourceTree = "<group>"; };
+		F859E4F720A5526A003AACF4 /* CFASSFileDialogueTextContent_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogueTextContent_Private.h; sourceTree = "<group>"; };
+		F866831320C88E2F00767276 /* CFASSFileControl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileControl.h; sourceTree = "<group>"; };
+		F866831420C88E2F00767276 /* CFASSFileControl.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFASSFileControl.c; sourceTree = "<group>"; };
+		F866831620C88FF100767276 /* CFASSFileControl_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileControl_Private.h; sourceTree = "<group>"; };
+		F866831A20C8FC6800767276 /* CFCrossPlatform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFCrossPlatform.h; sourceTree = "<group>"; };
+		F866831B20C8FC6800767276 /* CFCrossPlatform.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFCrossPlatform.c; sourceTree = "<group>"; };
 		F86A7BA120A201760021E6EE /* CFASSFile_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFile_Private.h; sourceTree = "<group>"; };
 		F86A7BA220A216F80021E6EE /* CFASSFileStyle.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileStyle.h; sourceTree = "<group>"; };
 		F86A7BA320A216F80021E6EE /* CFASSFileStyle.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFASSFileStyle.c; sourceTree = "<group>"; };
@@ -110,6 +128,7 @@
 		F8878D7D20A5837C00C48FE0 /* CFASSFileDialogueTextContentOverrideContent.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFASSFileDialogueTextContentOverrideContent.c; sourceTree = "<group>"; };
 		F8967CCA20AC872600CA56A3 /* CFASSFileDialogueEffect_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogueEffect_Private.h; sourceTree = "<group>"; };
 		F8967CCB20AD460F00CA56A3 /* CFASSFileDialogue_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogue_Private.h; sourceTree = "<group>"; };
+		F89EB2F220F61DDA00A29F80 /* ReadMe.rtf */ = {isa = PBXFileReference; lastKnownFileType = text.rtf; path = ReadMe.rtf; sourceTree = "<group>"; };
 		F8B3071220A846AC00226FD0 /* CFASSFileDialogueTextDrawingContext.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogueTextDrawingContext.h; sourceTree = "<group>"; };
 		F8B3071320A846AC00226FD0 /* CFASSFileDialogueTextDrawingContext.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CFASSFileDialogueTextDrawingContext.c; sourceTree = "<group>"; };
 		F8B3071520A8637A00226FD0 /* CFASSFileDialogueTextDrawingContext_Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CFASSFileDialogueTextDrawingContext_Private.h; sourceTree = "<group>"; };
@@ -155,15 +174,49 @@
 			path = ASS_editor;
 			sourceTree = "<group>";
 		};
+		F842314420C6BCCE0019810F /* CFPlatform */ = {
+			isa = PBXGroup;
+			children = (
+				F842314520C6BCDB0019810F /* CFPlatform.h */,
+				F866831A20C8FC6800767276 /* CFCrossPlatform.h */,
+				F866831B20C8FC6800767276 /* CFCrossPlatform.c */,
+			);
+			path = CFPlatform;
+			sourceTree = "<group>";
+		};
+		F842314920C70F560019810F /* CFEnumerator */ = {
+			isa = PBXGroup;
+			children = (
+				F842314A20C70F840019810F /* CFEnumerator.h */,
+				F842314D20C711A30019810F /* CFEnumerator_Private.h */,
+				F842314B20C70F840019810F /* CFEnumerator.c */,
+			);
+			path = CFEnumerator;
+			sourceTree = "<group>";
+		};
+		F842314F20C7BED90019810F /* CFASSFileChange */ = {
+			isa = PBXGroup;
+			children = (
+				F842315020C7BF170019810F /* CFASSFileChange.h */,
+				F842315720C7C1D00019810F /* CFASSFileChange_Private.h */,
+				F842315120C7BF170019810F /* CFASSFileChange.c */,
+			);
+			path = CFASSFileChange;
+			sourceTree = "<group>";
+		};
 		F859E4F820A5536A003AACF4 /* CFASSFile */ = {
 			isa = PBXGroup;
 			children = (
+				F866831220C88E1B00767276 /* CFASSFileControl */,
+				F842314F20C7BED90019810F /* CFASSFileChange */,
 				F859E50120A55443003AACF4 /* CFASSFileDialogueCollection */,
 				F859E4FF20A55427003AACF4 /* CFASSFileStyleCollection */,
 				F859E4FE20A55408003AACF4 /* CFASSFileScriptInfo */,
 				F82B7F4520A0EE6F006A58C0 /* CFASSFile.h */,
 				F86A7BA120A201760021E6EE /* CFASSFile_Private.h */,
 				F82B7F4620A0EE6F006A58C0 /* CFASSFile.c */,
+				F842314620C703150019810F /* CFASSFileKit.h */,
+				F89EB2F220F61DDA00A29F80 /* ReadMe.rtf */,
 			);
 			path = CFASSFile;
 			sourceTree = "<group>";
@@ -171,6 +224,8 @@
 		F859E4F920A55396003AACF4 /* CoreFoundation */ = {
 			isa = PBXGroup;
 			children = (
+				F842314920C70F560019810F /* CFEnumerator */,
+				F842314420C6BCCE0019810F /* CFPlatform */,
 				F8CDAC5820AE9C1100C12964 /* CFException */,
 				F8BF190920A6A1DD00CB876A /* CFDeclare */,
 				F859E4FD20A553E5003AACF4 /* CFPointerArray */,
@@ -214,6 +269,7 @@
 			isa = PBXGroup;
 			children = (
 				F859E4E320A411BE003AACF4 /* CFPointerArray.h */,
+				F842314E20C71A2A0019810F /* CFPointerArray_Private.h */,
 				F859E4E420A411BE003AACF4 /* CFPointerArray.c */,
 			);
 			path = CFPointerArray;
@@ -234,7 +290,7 @@
 			children = (
 				F859E50020A55430003AACF4 /* CFASSFileStyle */,
 				F82B7F4B20A0F13E006A58C0 /* CFASSFileStyleCollection.h */,
-				F82B7F5A20A16655006A58C0 /* CFASSFileStleCollection_Private.h */,
+				F82B7F5A20A16655006A58C0 /* CFASSFileStyleCollection_Private.h */,
 				F82B7F4C20A0F13E006A58C0 /* CFASSFileStyleCollection.c */,
 			);
 			path = CFASSFileStyleCollection;
@@ -300,7 +356,7 @@
 				F8B3071120A8467500226FD0 /* CFASSFileDialogueTextDrawingContext */,
 				F859E50620A554A5003AACF4 /* CFASSFileDialogueTextContentOverride */,
 				F859E4F420A55154003AACF4 /* CFASSFileDialogueTextContent.h */,
-				F859E4F720A5526A003AACF4 /* CFASSFileDialogueTextContent_Prvivate.h */,
+				F859E4F720A5526A003AACF4 /* CFASSFileDialogueTextContent_Private.h */,
 				F859E4F520A55154003AACF4 /* CFASSFileDialogueTextContent.c */,
 			);
 			path = CFASSFileDialogueTextContent;
@@ -315,6 +371,16 @@
 				F859E4F020A4481C003AACF4 /* CFASSFileDialogueTextContentOverride.c */,
 			);
 			path = CFASSFileDialogueTextContentOverride;
+			sourceTree = "<group>";
+		};
+		F866831220C88E1B00767276 /* CFASSFileControl */ = {
+			isa = PBXGroup;
+			children = (
+				F866831320C88E2F00767276 /* CFASSFileControl.h */,
+				F866831620C88FF100767276 /* CFASSFileControl_Private.h */,
+				F866831420C88E2F00767276 /* CFASSFileControl.c */,
+			);
+			path = CFASSFileControl;
 			sourceTree = "<group>";
 		};
 		F8878D7B20A5832000C48FE0 /* CFASSFileDialogueTextContentOverrideContent */ = {
@@ -416,15 +482,17 @@
 				F8BF190E20A6A2E700CB876A /* CFASSFileDialogueTextContentOverride.h in Sources */,
 				F8BF190F20A6A2E700CB876A /* CFASSFileDialogueTextContentOverride_Private.h in Sources */,
 				F8BF191020A6A2E700CB876A /* CFASSFileDialogueTextContent.h in Sources */,
-				F8BF191120A6A2E700CB876A /* CFASSFileDialogueTextContent_Prvivate.h in Sources */,
+				F8BF191120A6A2E700CB876A /* CFASSFileDialogueTextContent_Private.h in Sources */,
 				F8BF191220A6A2E700CB876A /* CFASSFileDialogueText.h in Sources */,
 				F8BF191320A6A2E700CB876A /* CFASSFileDialogueText_Private.h in Sources */,
+				F842315220C7BF170019810F /* CFASSFileChange.c in Sources */,
 				F8BF191420A6A2E700CB876A /* CFASSFileDialogueEffect.h in Sources */,
 				F8BF191520A6A2E700CB876A /* CFASSFileDialogue.h in Sources */,
 				F8BF190B20A6A2DD00CB876A /* CFDef.h in Sources */,
 				F859E4CC20A346DA003AACF4 /* CFAssert.h in Sources */,
 				F859E4F120A4481C003AACF4 /* CFASSFileDialogueTextContentOverride.c in Sources */,
 				F859E4CD20A346DA003AACF4 /* CFTextProvider.h in Sources */,
+				F866831520C88E2F00767276 /* CFASSFileControl.c in Sources */,
 				F859E4F620A55154003AACF4 /* CFASSFileDialogueTextContent.c in Sources */,
 				F859E4CE20A346DA003AACF4 /* CFTextProvider_Private.h in Sources */,
 				F859E4E520A411BE003AACF4 /* CFPointerArray.c in Sources */,
@@ -439,7 +507,7 @@
 				F859E4D620A346DA003AACF4 /* CFASSFileScriptInfo_Private.h in Sources */,
 				F859E4D720A346DA003AACF4 /* CFASSFileScriptInfo.c in Sources */,
 				F859E4D820A346DA003AACF4 /* CFASSFileStyleCollection.h in Sources */,
-				F859E4D920A346DA003AACF4 /* CFASSFileStleCollection_Private.h in Sources */,
+				F859E4D920A346DA003AACF4 /* CFASSFileStyleCollection_Private.h in Sources */,
 				F859E4DA20A346DA003AACF4 /* CFASSFileStyleCollection.c in Sources */,
 				F859E4DB20A346DA003AACF4 /* CFASSFileStyle.h in Sources */,
 				F859E4DC20A346DA003AACF4 /* CFASSFileStyle_Private.h in Sources */,
@@ -451,6 +519,8 @@
 				F8878D7E20A5837C00C48FE0 /* CFASSFileDialogueTextContentOverrideContent.c in Sources */,
 				F859E4DF20A346DA003AACF4 /* CFASSFileDialogueCollection_Private.h in Sources */,
 				F859E4E020A346DA003AACF4 /* CFASSFileDialogueCollection.c in Sources */,
+				F866831C20C8FC6800767276 /* CFCrossPlatform.c in Sources */,
+				F842314C20C70F840019810F /* CFEnumerator.c in Sources */,
 				F859E4E120A346DA003AACF4 /* CFUseTool.h in Sources */,
 				F859E4E220A346DA003AACF4 /* CFUseTool.c in Sources */,
 				F82B7F2620A0E961006A58C0 /* main.m in Sources */,

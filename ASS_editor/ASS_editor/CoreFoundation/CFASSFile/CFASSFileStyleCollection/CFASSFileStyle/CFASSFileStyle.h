@@ -9,15 +9,19 @@
 #ifndef CFASSFileStyle_h
 #define CFASSFileStyle_h
 
+#include "CFASSFileChange.h"
+
 typedef struct CFASSFileStyleColor
 {
     unsigned char alpha, blue, green, red;
 } CFASSFileStyleColor;
 
-CFASSFileStyleColor CFASSFileStyleColorMake(unsigned char alpha,
-                                            unsigned char blue,
-                                            unsigned char green,
-                                            unsigned char red);
+#pragma mark - Create/Copy/Destory
+
+CFASSFileStyleColor CFASSFileStyleColorMake(unsigned char alpha00,
+                                            unsigned char blueFF,
+                                            unsigned char greenFF,
+                                            unsigned char redFF);
 
 typedef struct CFASSFileStyle *CFASSFileStyleRef;
 
@@ -28,7 +32,7 @@ CFASSFileStyleRef CFASSFileStyleCreate(wchar_t *name,
                                        CFASSFileStyleColor outline_colour,
                                        bool blod, bool italic, bool underline, bool strike_out,
                                        double scale_x, double scale_y,
-                                       unsigned int spacing,
+                                       double spacing,
                                        double angle,
                                        int border_style,
                                        unsigned int outline, unsigned int shadow,
@@ -39,5 +43,9 @@ CFASSFileStyleRef CFASSFileStyleCreate(wchar_t *name,
 CFASSFileStyleRef CFASSFileStyleCopy(CFASSFileStyleRef style);
 
 void CFASSFileStyleDestory(CFASSFileStyleRef style);
+
+#pragma mark - Receive Change
+
+void CFASSFileStyleMakeChange(CFASSFileStyleRef style, CFASSFileChangeRef change);
 
 #endif /* CFASSFileStyle_h */

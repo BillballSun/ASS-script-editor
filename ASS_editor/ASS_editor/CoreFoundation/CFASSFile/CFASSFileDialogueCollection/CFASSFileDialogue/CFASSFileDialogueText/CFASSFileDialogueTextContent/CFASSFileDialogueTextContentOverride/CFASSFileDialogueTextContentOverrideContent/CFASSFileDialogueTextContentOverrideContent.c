@@ -12,6 +12,12 @@
 
 #include "CFASSFileDialogueTextContentOverrideContent.h"
 #include "CFUseTool.h"
+#include "CFException.h"
+#include "CFASSFileChange.h"
+#include "CFASSFileChange_Private.h"
+#include "CFASSFileDialogueTextDrawingContext.h"
+#include "CFASSFileDialogueTextDrawingContext_Private.h"
+
 
 struct CFASSFileDialogueTextContentOverrideContent {
     CFASSFileDialogueTextContentOverrideContentType type;
@@ -65,7 +71,7 @@ struct CFASSFileDialogueTextContentOverrideContent {
         }fontScale;
         struct
         {
-            unsigned int resolutionPixels;
+            double resolutionPixels; // can be negative and have decimal point
         } spacing;
         struct
         {
@@ -168,6 +174,10 @@ struct CFASSFileDialogueTextContentOverrideContent {
 static bool CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(const wchar_t *contentString,
                                                                               const wchar_t *endPoint,
                                                                               const wchar_t *matchAlpha);
+
+static bool CFASSFileDialogueTextContentOverrideContentCheckAnimationModifierSupport(CFASSFileDialogueTextContentOverrideContentRef content);
+
+static bool CFASSFileDialogueTextContentOverrideContentCheckAnimationModifiers(wchar_t *modifiers);
 
 #pragma mark - Translation between strings
 
@@ -333,8 +343,8 @@ CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverr
                                                                                       endPoint,
                                                                                       L"fsp"))
             {
-                unsigned int resolutionPixels;
-                if((temp = swscanf(contentString, L"\\fsp%u", &resolutionPixels)) == 1)
+                double resolutionPixels;
+                if((temp = swscanf(contentString, L"\\fsp%lf", &resolutionPixels)) == 1)
                 {
                     result->type = CFASSFileDialogueTextContentOverrideContentTypeFontSpacing;
                     result->data.spacing.resolutionPixels = resolutionPixels;
@@ -704,7 +714,9 @@ CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverr
                                 result->type = CFASSFileDialogueTextContentOverrideContentTypeAnimation;
                                 wmemcpy(result->data.animation.modifiers, dataBeginPoint, dataEndPoint-dataBeginPoint+1);
                                 result->data.animation.modifiers[dataEndPoint-dataBeginPoint+1] = L'\0';
-                                return result;
+                                if(CFASSFileDialogueTextContentOverrideContentCheckAnimationModifiers(result->data.animation.modifiers))
+                                    return result;
+                                free(result->data.animation.modifiers);
                             }
                         }
                     }
@@ -787,6 +799,12 @@ CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverr
                     result->type = CFASSFileDialogueTextContentOverrideContentTypeClip;
                     if(result->data.clip.usingDrawingCommand)
                     {
+                        if(result->data.clip.hasScale)
+                        {
+                            while (*dataBeginPoint!=L',')
+                                dataBeginPoint++;
+                            if(dataBeginPoint<endPoint) dataBeginPoint++;
+                        }
                         dataEndPoint = dataBeginPoint;
                         while(*dataEndPoint!=L')' && dataEndPoint<endPoint) dataEndPoint++;
                         if(*dataEndPoint == L')')
@@ -797,7 +815,13 @@ CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverr
                                 {
                                     wmemcpy(result->data.clip.drawingCommand, dataBeginPoint, dataEndPoint-dataBeginPoint+1);
                                     result->data.clip.drawingCommand[dataEndPoint-dataBeginPoint+1] = L'\0';
-                                    return result;
+                                    CFASSFileDialogueTextDrawingContextRef drawingContext;
+                                    if((drawingContext = CFASSFileDialogueTextDrawingContextCreateFromString(result->data.clip.drawingCommand)) != NULL)
+                                    {
+                                        CFASSFileDialogueTextDrawingContextDestory(drawingContext);
+                                        return result;
+                                    }
+                                    free(result->data.clip.drawingCommand);
                                 }
                         }
                     }
@@ -866,8 +890,10 @@ CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverr
                 }
                 else
                 {
+                    result->type = CFASSFileDialogueTextContentOverrideContentTypeReset;
                     result->data.reset.resetToDefault = true;
                     result->data.reset.styleName = NULL;
+                    return result;
                 }
             }
             free(result);
@@ -880,7 +906,7 @@ static bool CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(co
                                                                               const wchar_t *endPoint,
                                                                               const wchar_t *matchAlpha)
 {
-    if(*contentString != L'\\') return NULL;
+    if(*contentString != L'\\') return false;
     contentString++;
     const wchar_t *searchEnd = contentString - 1;
     while(iswalpha(searchEnd[1])) searchEnd++;
@@ -947,7 +973,7 @@ int CFASSFileDialogueTextContentOverrideContentStoreStringResult(CFASSFileDialog
                                   overrideContent->data.fontScale.percentage);
                 break;
             case CFASSFileDialogueTextContentOverrideContentTypeFontSpacing:
-                result = fwprintf(fp, L"\\fsp%u", overrideContent->data.spacing.resolutionPixels);
+                result = fwprintf(fp, L"\\fsp%g", overrideContent->data.spacing.resolutionPixels);
                 break;
             case CFASSFileDialogueTextContentOverrideContentTypeTextRotation:
                 if(overrideContent->data.rotation.usingComplexed)
@@ -1143,7 +1169,7 @@ int CFASSFileDialogueTextContentOverrideContentStoreStringResult(CFASSFileDialog
                                   overrideContent->data.fontScale.percentage);
                 break;
             case CFASSFileDialogueTextContentOverrideContentTypeFontSpacing:
-                result = swprintf(targetPoint,SIZE_MAX, L"\\fsp%u", overrideContent->data.spacing.resolutionPixels);
+                result = swprintf(targetPoint,SIZE_MAX, L"\\fsp%g", overrideContent->data.spacing.resolutionPixels);
                 break;
             case CFASSFileDialogueTextContentOverrideContentTypeTextRotation:
                 if(overrideContent->data.rotation.usingComplexed)
@@ -1807,15 +1833,89 @@ CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverr
     return NULL;
 }
 
+#pragma mark - Other function
 
+void CFASSFileDialogueTextContentOverrideContentMakeChange(CFASSFileDialogueTextContentOverrideContentRef overrideContent, CFASSFileChangeRef change)
+{
+    if(overrideContent == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueTextContentOverrideContent %p MakeChange %p", overrideContent, change);
+    if(change->type & CFASSFileChangeTypeFontSize)
+    {
+        if(overrideContent->type == CFASSFileDialogueTextContentOverrideContentTypeFontSize && change->fontSize.affectOverride)
+        {
+            if(change->fontSize.byPercentage)
+                overrideContent->data.fontSize.resolutionPixels *= change->fontSize.percentage;
+            else
+                overrideContent->data.fontSize.resolutionPixels = change->fontSize.fontSize;
+        }
+    }
+    if(change->type & CFASSFileChangeTypeFontName)
+    {
+        if(overrideContent->type == CFASSFileDialogueTextContentOverrideContentTypeFontName && change->fontSize.affectOverride)
+        {
+            wchar_t *dumped = CF_Dump_wchar_string(change->fontName.fontName);
+            if(dumped != NULL)
+            {
+                free(overrideContent->data.fontName.name);
+                overrideContent->data.fontName.name = dumped;
+            }
+        }
+    }
+}
 
+static bool CFASSFileDialogueTextContentOverrideContentCheckAnimationModifiers(wchar_t *modifiers)
+{
+    if(modifiers == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueTextContentOverrideContentCheckAnimationModifiers NULL");
+    if(*modifiers!=L'\\')   // include modifier[0] == L'\0'
+        return false;
+    wchar_t *nextBeginPoint;
+    CFASSFileDialogueTextContentOverrideContentRef modifierContent;
+    while ((nextBeginPoint = wcschr(modifiers+1, L'\\'))!=NULL)
+    {
+        modifierContent = CFASSFileDialogueTextContentOverrideContentCreateWithString(modifiers, nextBeginPoint-1);
+        if(modifierContent == NULL)
+            return false;
+        if(!CFASSFileDialogueTextContentOverrideContentCheckAnimationModifierSupport(modifierContent))
+        {
+            CFASSFileDialogueTextContentOverrideContentDestory(modifierContent);
+            return false;
+        }
+        CFASSFileDialogueTextContentOverrideContentDestory(modifierContent);
+        modifiers = nextBeginPoint;
+    }
+    wchar_t *endPoint = modifiers+wcslen(modifiers)-1;
+    modifierContent = CFASSFileDialogueTextContentOverrideContentCreateWithString(modifiers, endPoint);
+    if(modifierContent == NULL)
+        return false;
+    if(!CFASSFileDialogueTextContentOverrideContentCheckAnimationModifierSupport(modifierContent))
+    {
+        CFASSFileDialogueTextContentOverrideContentDestory(modifierContent);
+        return false;
+    }
+    CFASSFileDialogueTextContentOverrideContentDestory(modifierContent);
+    return true;
+}
 
-
-
-
-
-
-
+static bool CFASSFileDialogueTextContentOverrideContentCheckAnimationModifierSupport(CFASSFileDialogueTextContentOverrideContentRef content)
+{
+    CFASSFileDialogueTextContentOverrideContentType type = content->type;
+    if(type == CFASSFileDialogueTextContentOverrideContentTypeFontSize ||
+       type == CFASSFileDialogueTextContentOverrideContentTypeFontSpacing ||
+       type == CFASSFileDialogueTextContentOverrideContentTypeColor ||
+       type == CFASSFileDialogueTextContentOverrideContentTypeAlpha ||
+       type == CFASSFileDialogueTextContentOverrideContentTypeFontScale ||
+       type == CFASSFileDialogueTextContentOverrideContentTypeTextRotation ||
+       type == CFASSFileDialogueTextContentOverrideContentTypeTextShearing ||
+       type == CFASSFileDialogueTextContentOverrideContentTypeBorder ||
+       type == CFASSFileDialogueTextContentOverrideContentTypeShadow ||
+       type == CFASSFileDialogueTextContentOverrideContentTypeBlurEdge)
+        return true;
+    else if(type == CFASSFileDialogueTextContentOverrideContentTypeClip &&
+            !content->data.clip.usingDrawingCommand)
+        return true;
+    return false;
+}
 
 
 

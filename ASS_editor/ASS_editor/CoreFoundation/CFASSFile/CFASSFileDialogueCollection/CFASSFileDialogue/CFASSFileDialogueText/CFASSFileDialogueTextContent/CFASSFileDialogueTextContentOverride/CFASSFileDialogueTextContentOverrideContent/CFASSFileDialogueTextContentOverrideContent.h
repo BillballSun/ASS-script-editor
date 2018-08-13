@@ -13,6 +13,7 @@
 #include <wchar.h>
 
 #include "CFDef.h"
+#include "CFASSFileChange.h"
 
 typedef struct CFASSFileDialogueTextContentOverrideContent *CFASSFileDialogueTextContentOverrideContentRef;
 
@@ -47,9 +48,7 @@ typedef enum CFASSFileDialogueTextContentOverrideContentType {
     CFASSFileDialogueTextContentOverrideContentTypeBaselineOffset
 } CFASSFileDialogueTextContentOverrideContentType;
 
-CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverrideContentCopy(CFASSFileDialogueTextContentOverrideContentRef overrideContent);
-
-void CFASSFileDialogueTextContentOverrideContentDestory(CFASSFileDialogueTextContentOverrideContentRef overrideContent);
+#pragma mark - Create/Copy/Destory
 
 CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverrideBlodContentCreate(unsigned int blod);
 /* blod */
@@ -157,6 +156,14 @@ CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverr
 CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverrideDrawingContentCreate(unsigned int drawingMode);
 
 CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverrideBaselineOffsetContentCreate(int towardsBottomPixels);
+
+CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverrideContentCopy(CFASSFileDialogueTextContentOverrideContentRef overrideContent);
+
+void CFASSFileDialogueTextContentOverrideContentDestory(CFASSFileDialogueTextContentOverrideContentRef overrideContent);
+
+#pragma mark - Receive Change
+
+void CFASSFileDialogueTextContentOverrideContentMakeChange(CFASSFileDialogueTextContentOverrideContentRef overrideContent, CFASSFileChangeRef change);
 
 #endif /* CFASSFileDialogueTextContentOverrideContent_h */
 

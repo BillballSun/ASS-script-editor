@@ -11,6 +11,16 @@
 
 #include "CFASSFileDialogue.h"
 
+#pragma mark - Read File
+
+CFASSFileDialogueRef CFASSFileDialogueCreateWithString(const wchar_t *source);
+/* source */
+// begin with "Dialogue:", end with '\n' or '\0'
+/* Discussion */
+// this function should handle the empty source, that is point to '\n'
+
+#pragma mark - Store Result
+
 int CFASSFileDialogueStoreStringResult(CFASSFileDialogueRef dialogue, wchar_t *targetPoint);
 /* targetPoint */
 // this could be NULL
@@ -20,10 +30,5 @@ int CFASSFileDialogueStoreStringResult(CFASSFileDialogueRef dialogue, wchar_t *t
 // return will be the store string Length if targetPoint is long enough even is NULL
 // this begin with "Dialogue:" end with '\n'
 
-CFASSFileDialogueRef CFASSFileDialogueCreateWithString(const wchar_t *source);
-/* source */
-// begin with "Dialogue:", end with '\n' or '\0'
-/* Discussion */
-// this function should handle the empty source, that is point to '\n'
 
 #endif /* CFASSFileDialogue_Private_h */

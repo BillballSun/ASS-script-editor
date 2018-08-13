@@ -11,10 +11,12 @@
 
 #include "CFUseTool.h"
 #include "CFASSFileDialogueTextContent.h"
-#include "CFASSFileDialogueTextContent_Prvivate.h"
+#include "CFASSFileDialogueTextContent_Private.h"
 #include "CFASSFileDialogueTextContentOverride.h"
 #include "CFASSFileDialogueTextContentOverride_Private.h"
 #include "CFException.h"
+#include "CFASSFileChange.h"
+#include "CFASSFileChange_Private.h"
 
 struct CFASSFileDialogueTextContent
 {
@@ -25,6 +27,26 @@ struct CFASSFileDialogueTextContent
         CFASSFileDialogueTextContentOverrideRef override;
     } data;
 };
+
+void CFASSFileDialogueTextContentMakeChange(CFASSFileDialogueTextContentRef textContent, CFASSFileChangeRef change)
+{
+    if(textContent == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueTextContent %p MakeChange %p", textContent, change);
+    if(textContent->type == CFASSFileDialogueTextContentTypeOverride &&
+       CFASSFileChangeShouldDispatchToDialogueTextContentOverride(change))
+        CFASSFileDialogueTextContentOverrideMakeChange(textContent->data.override, change);
+    else
+    {
+        /* change applied to text type */
+    }
+}
+
+CFASSFileDialogueTextContentType CFASSFileDialogueTextContentGetType(CFASSFileDialogueTextContentRef textContent)
+{
+    if(textContent == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueTextContent NULL GetType");
+    return textContent->type;
+}
 
 CFASSFileDialogueTextContentRef CFASSFileDialogueTextContentCreateWithText(wchar_t *text, bool transferAllocationOwnership)
 {

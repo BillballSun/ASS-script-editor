@@ -11,8 +11,18 @@
 
 typedef struct CFASSFileDialogueCollection *CFASSFileDialogueCollectionRef;
 
+#pragma mark - Copy/Destory
+
 CFASSFileDialogueCollectionRef CFASSFileDialogueCollectionCopy(CFASSFileDialogueCollectionRef dialogueCollection);
 
 void CFASSFileDialogueCollectionDestory(CFASSFileDialogueCollectionRef dialogueCollection);
+
+#pragma mark - Get Component
+
+CFEnumeratorRef CFASSFileDialogueCollectionCreateEnumerator(CFASSFileDialogueCollectionRef dialogueCollection);
+
+#pragma mark - Receive Change
+
+void CFASSFileDialogueCollectionMakeChange(CFASSFileDialogueCollectionRef dialogueCollection, CFASSFileChangeRef change);
 
 #endif /* CFASSFileDialogueCollection_h */

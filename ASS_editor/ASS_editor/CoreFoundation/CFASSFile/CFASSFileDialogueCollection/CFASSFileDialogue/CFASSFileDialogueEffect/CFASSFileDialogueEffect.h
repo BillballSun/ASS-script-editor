@@ -11,12 +11,16 @@
 
 #include <stdbool.h>
 
+#include "CFASSFileChange.h"
+
 typedef struct CFASSFileDialogueEffect *CFASSFileDialogueEffectRef;
 
 typedef enum CFASSFileDialogueEffectScrollDirection {
     CFASSFileDialogueEffectScrollDirectionUp,
     CFASSFileDialogueEffectScrollDirectionDown
 } CFASSFileDialogueEffectScrollDirection;
+
+#pragma mark - Create/Copy/Destory
 
 CFASSFileDialogueEffectRef CFASSFileDialogueEffectCreateKaraoke(void);
 
@@ -33,8 +37,12 @@ CFASSFileDialogueEffectRef CFASSFileDialogueEffectCreateBanner(unsigned int dela
                                                                bool hasFadeAwayWidth,
                                                                int fadeAwayWidth);
 
+CFASSFileDialogueEffectRef CFASSFileDialogueEffectCopy(CFASSFileDialogueEffectRef effect);
+
 void CFASSFileDialogueEffectDestory(CFASSFileDialogueEffectRef effect);
 
-CFASSFileDialogueEffectRef CFASSFileDialogueEffectCopy(CFASSFileDialogueEffectRef effect);
+#pragma mark - Receive Change
+
+void CFASSFileDialogueEffectMakeChange(CFASSFileDialogueEffectRef effect, CFASSFileChangeRef change);
 
 #endif /* CFASSFileDialogueEffect_h */

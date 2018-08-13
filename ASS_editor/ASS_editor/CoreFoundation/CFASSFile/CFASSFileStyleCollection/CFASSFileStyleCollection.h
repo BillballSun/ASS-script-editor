@@ -9,10 +9,22 @@
 #ifndef CFASSFileStyleCollection_h
 #define CFASSFileStyleCollection_h
 
+#include "CFEnumerator.h"
+
 typedef struct CFASSFileStyleCollection *CFASSFileStyleCollectionRef;
+
+#pragma mark - Create/Copy/Destory
 
 CFASSFileStyleCollectionRef CFASSFileStyleCollectionCopy(CFASSFileStyleCollectionRef styleCollection);
 
 void CFASSFileStyleCollectionDestory(CFASSFileStyleCollectionRef styleCollection);
+
+#pragma mark - Get Component
+
+CFEnumeratorRef CFASSFileStyleCollectionCreateEnumerator(CFASSFileStyleCollectionRef styleCollection);
+
+#pragma mark - Receive Change
+
+void CFASSFileStyleCollectionMakeChange(CFASSFileStyleCollectionRef styleCollection, CFASSFileChangeRef change);
 
 #endif /* CFASSFileStyleCollection_h */

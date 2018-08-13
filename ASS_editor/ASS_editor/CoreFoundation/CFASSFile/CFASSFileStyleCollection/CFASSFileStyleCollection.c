@@ -13,12 +13,16 @@
 #include "CFASSFile.h"
 #include "CFASSFile_Private.h"
 #include "CFASSFileStyleCollection.h"
-#include "CFASSFileStleCollection_Private.h"
+#include "CFASSFileStyleCollection_Private.h"
 #include "CFPointerArray.h"
 #include "CFUseTool.h"
 #include "CFASSFileStyle.h"
 #include "CFASSFileStyle_Private.h"
 #include "CFUnicodeStringArray.h"
+#include "CFException.h"
+#include "CFEnumerator.h"
+#include "CFASSFileControl.h"
+#include "CFASSFileControl_Private.h"
 
 struct CFASSFileStyleCollection
 {
@@ -27,6 +31,24 @@ struct CFASSFileStyleCollection
 };
 
 static wchar_t const * const CFASSFileStyleCollectionDiscription = L"Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n";
+
+CFEnumeratorRef CFASSFileStyleCollectionCreateEnumerator(CFASSFileStyleCollectionRef styleCollection)
+{
+    if(styleCollection == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileStyleCollection NULL CreateEnumerator");
+    return CFEnumeratorCreateFromArray(styleCollection->styleCollection);
+}
+
+void CFASSFileStyleCollectionMakeChange(CFASSFileStyleCollectionRef styleCollection, CFASSFileChangeRef change)
+{
+    if(styleCollection == NULL || change == NULL)
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileStyleCollection %p MakeChange %p", styleCollection, change);
+    CFEnumeratorRef enumerator = CFASSFileStyleCollectionCreateEnumerator(styleCollection);
+    CFASSFileStyleRef eachStyle;
+    while ((eachStyle = CFEnumeratorNextObject(enumerator)) != NULL)
+        CFASSFileStyleMakeChange(eachStyle, change);
+    CFEnumeratorDestory(enumerator);
+}
 
 CFASSFileStyleCollectionRef CFASSFileStyleCollectionCopy(CFASSFileStyleCollectionRef styleCollection)
 {
@@ -75,7 +97,7 @@ wchar_t *CFASSFileStyleCollectionAllocateFileContent(CFASSFileStyleCollectionRef
                 CFASSFileStyleAllocateFileContent
                 ((CFASSFileStyleRef)CFPointerArrayGetPointerAtIndex(styleCollection->styleCollection,
                                                                     count-1))) != NULL)
-                CFUnicodeStringArrayAddString(stringArray, eachStyle);
+                CFUnicodeStringArrayAddString(stringArray, eachStyle, true);
             else
                 isAllocatingSuccess = false;
         }
@@ -146,7 +168,13 @@ CFASSFileStyleCollectionRef CFASSFileStyleCollectionCreateWithUnicodeFileContent
                 {
                     beginPoint++;
                     if((eachStyle = CFASSFileStyleCreateWithString(beginPoint)) == NULL)
-                        isFormatCorrect = false;
+                    {
+                        CFASSFileControlErrorHandling errorHandle = CFASSFileControlGetErrorHandling();
+                        if(!(errorHandle & CFASSFileControlErrorHandlingIgnore))
+                            isFormatCorrect = false;
+                        if(errorHandle & CFASSFileControlErrorHandlingOutput)
+                            CFASSFileControlErrorOutput(content, beginPoint);
+                    }
                     else
                         CFPointerArrayAddPointer(result->styleCollection, eachStyle, false);
                 }
@@ -177,55 +205,3 @@ int CFASSFileStyleCollectionRegisterAssociationwithFile(CFASSFileStyleCollection
     else
         return -1;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

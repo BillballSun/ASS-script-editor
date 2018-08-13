@@ -53,6 +53,13 @@ long CF_multibyte_character_amount(const char *mbs);
 
 wchar_t *CF_Dump_mbs_to_wcs(const char *mbs);
 
+CFTextEncoding CF_check_text_encoding(const char *string);
+
+int CF_find_line_number_in_wchar_text(const wchar_t *text, const wchar_t *line);
+// if failed, return -1
+
+wchar_t *CF_allocate_text_translation_from_winStyle_to_unixStyle(const wchar_t *winText);
+
 #endif /* CFUseTool_h */
 
 

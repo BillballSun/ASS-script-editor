@@ -13,6 +13,8 @@
 
 wchar_t *CFASSFileDialogueTextDrawingContextAllocateString(CFASSFileDialogueTextDrawingContextRef context);
 
+CFASSFileDialogueTextDrawingContextRef CFASSFileDialogueTextDrawingContextCreateFromString(const wchar_t *string);
+
 bool CFASSFileDialogueTextDrawingContextCheckValidation(CFASSFileDialogueTextDrawingContextRef context);
 
 #endif /* CFASSFileDialogueTextDrawingContext_Private_h */
