@@ -9,3 +9,6 @@ the may entrance is the ASSFile.h, hope you enjoy it.
 /* Issue */
 
 1. the Xcode or apple's standard C library seems not support the whole wchar_t range. (Resolved)
+How I resolved:
+  Unix terminal $local - a
+  Then setlocale("zh_CN", LOCAL_ALL);
