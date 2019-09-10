@@ -9,7 +9,6 @@
 #ifndef CFASSFileScriptInfo_h
 #define CFASSFileScriptInfo_h
 
-#include "CFStringTool.h"
 #include "CFASSFileChange.h"
 
 typedef struct CFASSFileScriptInfo *CFASSFileScriptInfoRef;
