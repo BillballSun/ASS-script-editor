@@ -31,7 +31,6 @@ spec.source       = { :git => 'https://github.com/BillballSun/ASS-script-editor.
     sub.requires_arc = false
     sub.source_files = 'Core/**/*.{h,c,m,mm}'
     sub.public_header_files = 'Core/**/*.h'
-    sub.private_header_files = 'Core/**/*_Private.h'
   end
 
 end
