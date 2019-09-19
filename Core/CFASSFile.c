@@ -21,6 +21,10 @@
 #include "CFException.h"
 #include "CFASSFileChange.h"
 #include "CFASSFileChange_Private.h"
+#include "CFMacro.h"
+
+CLANG_DIAGNOSTIC_PUSH
+CLANG_DIAGNOSTIC_IGNORE_NONNULL
 
 struct CFASSFile
 {
@@ -102,10 +106,10 @@ CFASSFileRef CFASSFileCreate(CFASSFileScriptInfoRef scriptInfo,
                              CFASSFileDialogueCollectionRef dialogueCollection,
                              bool transferOwnerShip)
 {
-    if(scriptInfo==NULL || styleCollection==NULL || dialogueCollection==NULL)
+    if(scriptInfo == NULL || styleCollection == NULL || dialogueCollection == NULL)
         return NULL;
     CFASSFileRef result;
-    if((result = malloc(sizeof(struct CFASSFile)))!=NULL)
+    if((result = malloc(sizeof(struct CFASSFile))) != NULL)
     {
         if(transferOwnerShip)
         {
@@ -118,12 +122,12 @@ CFASSFileRef CFASSFileCreate(CFASSFileScriptInfoRef scriptInfo,
             result->scriptInfo = CFASSFileScriptInfoCopy(scriptInfo);
             result->styleCollection = CFASSFileStyleCollectionCopy(styleCollection);
             result->dialogueCollection = CFASSFileDialogueCollectionCopy(dialogueCollection);
-            if(result->scriptInfo==NULL || result->styleCollection==NULL || result->dialogueCollection==NULL)
+            if(result->scriptInfo == NULL || result->styleCollection == NULL || result->dialogueCollection == NULL)
             {
                 CFExceptionRaise(CFExceptionNameProcessFailed, NULL, "CFASSFile copy user-provided component failed");
-                if(result->scriptInfo!=NULL) CFASSFileScriptInfoDestory(result->scriptInfo);
-                if(result->styleCollection!=NULL) CFASSFileStyleCollectionDestory(result->styleCollection);
-                if(result->dialogueCollection!=NULL) CFASSFileDialogueCollectionDestory(result->dialogueCollection);
+                if(result->scriptInfo != NULL) CFASSFileScriptInfoDestory(result->scriptInfo);
+                if(result->styleCollection != NULL) CFASSFileStyleCollectionDestory(result->styleCollection);
+                if(result->dialogueCollection != NULL) CFASSFileDialogueCollectionDestory(result->dialogueCollection);
                 return NULL;
             }
         }
@@ -135,46 +139,51 @@ CFASSFileRef CFASSFileCreate(CFASSFileScriptInfoRef scriptInfo,
     return NULL;
 }
 
-CFASSFileRef CFASSFileCreateWithTextProvider(CFTextProviderRef provider)
-{
-    if(provider == NULL)
-    {
-        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileCreateWithTextProvider NULL");
+CFASSFileRef CFASSFileCreateWithTextProvider(CFTextProviderRef provider, CFASSFileParsingResultRef *parsingResult_ownershipTransferred) {
+    if(parsingResult_ownershipTransferred != NULL) *parsingResult_ownershipTransferred = NULL;
+    if(provider == NULL) {
+        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileCreateWithTextProvider provide is NULL");
         return NULL;
     }
-    wchar_t *fileContent = CFTextProviderAllocateTextContentwithUnicodeEncoding(provider, NULL);
-    CFASSFileRef result = NULL; // needs intialization
-    if(fileContent!=NULL && (result = malloc(sizeof(struct CFASSFile)))!=NULL)
-    {
-        if((result->scriptInfo = CFASSFileScriptInfoCreateWithUnicodeFileContent(fileContent)) == NULL)
-        {
+    wchar_t *fileContent;
+    if((fileContent = CFTextProviderAllocateTextContentwithUnicodeEncoding(provider, NULL)) != NULL) {
+        CFASSFileRef result;
+        if((result = malloc(sizeof(struct CFASSFile))) != NULL) {
+            CFASSFileParsingResultRef parsingResult;
+            if((parsingResult = CFASSFileParsingResultCreate()) != NULL) {
+                if((result->scriptInfo = CFASSFileScriptInfoCreateWithUnicodeFileContent(fileContent, parsingResult)) != NULL) {
+                    if((result->styleCollection = CFASSFileStyleCollectionCreateWithUnicodeFileContent(fileContent, parsingResult)) != NULL) {
+                        if((result->dialogueCollection = CFASSFileDialogueCollectionCreateWithUnicodeFileContent(fileContent, parsingResult)) != NULL) {
+                            if(parsingResult_ownershipTransferred != NULL) {
+                                CFASSFileParsingResultSetParsingString(parsingResult, fileContent, true);
+                                *parsingResult_ownershipTransferred = parsingResult;
+                            }
+                            else {  // DEBUG Parsing result here
+                                free(fileContent);
+                                CFASSFileParsingResultDestory(parsingResult);
+                            }
+                            CFASSFileScriptInfoRegisterAssociationwithFile(result->scriptInfo, result);
+                            CFASSFileStyleCollectionRegisterAssociationwithFile(result->styleCollection, result);
+                            CFASSFileDialogueCollectionRegisterAssociationwithFile(result->dialogueCollection , result);
+                            return result;
+                        } DEBUG_ELSE
+                        CFASSFileStyleCollectionDestory(result->styleCollection);
+                    } DEBUG_ELSE
+                    CFASSFileScriptInfoDestory(result->scriptInfo);
+                } DEBUG_ELSE
+                if(parsingResult_ownershipTransferred != NULL) *parsingResult_ownershipTransferred = parsingResult;
+                else CFASSFileParsingResultDestory(parsingResult);
+            } DEBUG_ELSE
             free(result);
-            return NULL;
-        }
-        if((result->styleCollection = CFASSFileStyleCollectionCreateWithUnicodeFileContent(fileContent)) == NULL)
-        {
-            CFASSFileScriptInfoDestory(result->scriptInfo);
-            free(result);
-            return NULL;
-        }
-        if((result->dialogueCollection = CFASSFileDialogueCollectionCreateWithUnicodeFileContent(fileContent)) == NULL)
-        {
-            CFASSFileScriptInfoDestory(result->scriptInfo);
-            CFASSFileStyleCollectionDestory(result->styleCollection);
-            free(result);
-            return NULL;
-        }
-    }
-    CFASSFileScriptInfoRegisterAssociationwithFile(result->scriptInfo, result);
-    CFASSFileStyleCollectionRegisterAssociationwithFile(result->styleCollection, result);
-    CFASSFileDialogueCollectionRegisterAssociationwithFile(result->dialogueCollection , result);
-    free(fileContent);
-    return result;
+        } DEBUG_ELSE
+        free(fileContent);
+    } DEBUG_ELSE
+    return NULL;
 }
 
 void CFASSFileDestory(CFASSFileRef file)
 {
-    if(file==NULL) return;
+    if(file == NULL) return;
     CFASSFileScriptInfoDestory(file->scriptInfo);
     CFASSFileStyleCollectionDestory(file->styleCollection);
     CFASSFileDialogueCollectionDestory(file->dialogueCollection);
@@ -191,17 +200,18 @@ wchar_t *CFASSFileAllocateFileContent(CFASSFileRef file)
     wchar_t *scriptInfo = CFASSFileScriptInfoAllocateFileContent(file->scriptInfo),
     *styleCollection = CFASSFileStyleCollectionAllocateFileContent(file->styleCollection),
     *dialogueCollection = CFASSFileDialogueCollectionAllocateFileContent(file->dialogueCollection);
+    
     if(scriptInfo == NULL || styleCollection == NULL || dialogueCollection == NULL)
     {
-        CFExceptionRaise(CFExceptionNameProcessFailed, NULL, "CFASSFileAllocateFileContent failed scriptInfo %X styleCollection %X dialogueCollection %X", (unsigned int)scriptInfo, (unsigned int)styleCollection, (unsigned int)dialogueCollection);
-        if(scriptInfo!=NULL) free(scriptInfo);
-        if(styleCollection!=NULL) free(styleCollection);
-        if(dialogueCollection!=NULL) free(dialogueCollection);
+        DEBUG_POINT;
+        if(scriptInfo != NULL) free(scriptInfo);
+        if(styleCollection != NULL) free(styleCollection);
+        if(dialogueCollection != NULL) free(dialogueCollection);
         return NULL;
     }
     size_t stringLength = wcslen(scriptInfo) + wcslen(styleCollection) + wcslen(dialogueCollection);
     wchar_t *result;
-    if((result = malloc(sizeof(wchar_t)*(stringLength+1)))!=NULL)
+    if((result = malloc(sizeof(wchar_t) * (stringLength + 1))) != NULL)
     {
         wcscpy(result, scriptInfo);
         wcscat(result, styleCollection);
@@ -210,5 +220,8 @@ wchar_t *CFASSFileAllocateFileContent(CFASSFileRef file)
     free(scriptInfo);
     free(styleCollection);
     free(dialogueCollection);
+    DEBUG_ASSERT(wcslen(result) == stringLength);
     return result;
 }
+
+CLANG_DIAGNOSTIC_POP

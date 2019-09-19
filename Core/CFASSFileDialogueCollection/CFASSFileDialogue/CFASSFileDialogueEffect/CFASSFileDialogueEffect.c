@@ -18,6 +18,12 @@
 #include "CFASSFileChange.h"
 #include "CFASSFileChange_Private.h"
 #include "CFException.h"
+#include "CFASSFileParsingResult.h"
+#include "CFASSFileParsingResult_Macro.h"
+#include "CFMacro.h"
+
+CLANG_DIAGNOSTIC_PUSH
+CLANG_DIAGNOSTIC_IGNORE_NONNULL
 
 typedef enum CFASSFileDialogueEffectType
 {
@@ -66,7 +72,9 @@ CFASSFileDialogueEffectRef CFASSFileDialogueEffectCopy(CFASSFileDialogueEffectRe
     return NULL;
 }
 
-CFASSFileDialogueEffectRef CFASSFileDialogueEffectCreateWithString(const wchar_t *beginPoint, const wchar_t *endPoint)
+CFASSFileDialogueEffectRef CFASSFileDialogueEffectCreateWithString(const wchar_t * _Nonnull beginPoint,
+                                                                   const wchar_t * _Nonnull endPoint,
+                                                                   CFASSFileParsingResultRef _Nonnull parsingResult)
 {
     // Karaoke
     // Scroll up;y1;y2;delay[;fadeawayheight]
@@ -156,7 +164,7 @@ CFASSFileDialogueEffectRef CFASSFileDialogueEffectCreateWithString(const wchar_t
         }
         return result;
 
-    }
+    } else PR_ERROR(beginPoint, L"CFASSFileDialogueEffect unkown effect");
     return NULL;
 }
 int CFASSFileDialogueEffectStoreStringResult(CFASSFileDialogueEffectRef effect, wchar_t *targetPoint)
@@ -308,53 +316,4 @@ CFASSFileDialogueEffectRef CFASSFileDialogueEffectCreateBanner(unsigned int dela
     return NULL;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+CLANG_DIAGNOSTIC_POP

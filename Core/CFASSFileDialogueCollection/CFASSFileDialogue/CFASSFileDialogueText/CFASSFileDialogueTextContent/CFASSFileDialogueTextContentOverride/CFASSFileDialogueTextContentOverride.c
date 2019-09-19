@@ -19,11 +19,17 @@
 #include "CFEnumerator.h"
 #include "CFASSFileChange.h"
 #include "CFASSFileChange_Private.h"
+#include "CFASSFileParsingResult.h"
+#include "CFASSFileParsingResult_Macro.h"
+#include "CFMacro.h"
 
 struct CFASSFileDialogueTextContentOverride
 {
     CFPointerArrayRef contentArray;
 };
+
+CLANG_DIAGNOSTIC_PUSH
+CLANG_DIAGNOSTIC_IGNORE_NONNULL
 
 void CFASSFileDialogueTextContentOverrideMakeChange(CFASSFileDialogueTextContentOverrideRef override, CFASSFileChangeRef change)
 {
@@ -85,10 +91,10 @@ CFASSFileDialogueTextContentOverrideRef CFASSFileDialogueTextContentOverrideCopy
     {
         if((result->contentArray = CFPointerArrayCreateEmpty()) != NULL)
         {
-            size_t arrayLength = CFPointerArrayGetLength(override->contentArray);
+            size_t arrayCount = CFPointerArrayGetCount(override->contentArray);
             bool copyCheck = true;
             CFASSFileDialogueTextContentOverrideContentRef eachOverrideContent;
-            for(size_t index = 0; index < arrayLength && copyCheck; index++)
+            for(size_t index = 0; index < arrayCount && copyCheck; index++)
             {
                 eachOverrideContent = CFASSFileDialogueTextContentOverrideContentCopy
                 ((CFASSFileDialogueTextContentOverrideContentRef)CFPointerArrayGetPointerAtIndex(override->contentArray, index));
@@ -99,8 +105,8 @@ CFASSFileDialogueTextContentOverrideRef CFASSFileDialogueTextContentOverrideCopy
             }
             if(copyCheck)
                 return result;
-            arrayLength = CFPointerArrayGetLength(result->contentArray);
-            for(size_t index = 0; index < arrayLength; index++)
+            arrayCount = CFPointerArrayGetCount(result->contentArray);
+            for(size_t index = 0; index < arrayCount; index++)
                 CFASSFileDialogueTextContentOverrideContentDestory
                 ((CFASSFileDialogueTextContentOverrideContentRef)CFPointerArrayGetPointerAtIndex(result->contentArray, index));
         }
@@ -112,8 +118,8 @@ CFASSFileDialogueTextContentOverrideRef CFASSFileDialogueTextContentOverrideCopy
 void CFASSFileDialogueTextContentOverrideDestory(CFASSFileDialogueTextContentOverrideRef override)
 {
     if(override == NULL) return;
-    size_t arrayLength = CFPointerArrayGetLength(override->contentArray);
-    for(size_t index = 0; index<arrayLength; index++)
+    size_t arrayCount = CFPointerArrayGetCount(override->contentArray);
+    for(size_t index = 0; index < arrayCount; index++)
         CFASSFileDialogueTextContentOverrideContentDestory
         ((CFASSFileDialogueTextContentOverrideContentRef)CFPointerArrayGetPointerAtIndex(override->contentArray, index));
     CFPointerArrayDestory(override->contentArray);
@@ -130,8 +136,8 @@ int CFASSFileDialogueTextContentOverrideStoreStringResult(CFASSFileDialogueTextC
     int result = 0, temp;
     if(targetPoint == NULL)
     {
-        size_t arrayLength = CFPointerArrayGetLength(override->contentArray);
-        for(size_t index = 0; index<arrayLength; index++)
+        size_t arrayCount = CFPointerArrayGetCount(override->contentArray);
+        for(size_t index = 0; index < arrayCount; index++)
         {
             temp = CFASSFileDialogueTextContentOverrideContentStoreStringResult
             ((CFASSFileDialogueTextContentOverrideContentRef)CFPointerArrayGetPointerAtIndex(override->contentArray, index), NULL);
@@ -143,8 +149,8 @@ int CFASSFileDialogueTextContentOverrideStoreStringResult(CFASSFileDialogueTextC
     else
     {
         *targetPoint++ = L'{';
-        size_t arrayLength = CFPointerArrayGetLength(override->contentArray);
-        for(size_t index = 0; index<arrayLength; index++)
+        size_t arrayCount = CFPointerArrayGetCount(override->contentArray);
+        for(size_t index = 0; index < arrayCount; index++)
         {
             temp = CFASSFileDialogueTextContentOverrideContentStoreStringResult
             ((CFASSFileDialogueTextContentOverrideContentRef)CFPointerArrayGetPointerAtIndex(override->contentArray, index), targetPoint);
@@ -162,76 +168,54 @@ int CFASSFileDialogueTextContentOverrideStoreStringResult(CFASSFileDialogueTextC
     }
 }
 
-CFASSFileDialogueTextContentOverrideRef CFASSFileDialogueTextContentOverrideCreateWithString(const wchar_t *string, bool isIncludeBraces)
+CFASSFileDialogueTextContentOverrideRef CFASSFileDialogueTextContentOverrideCreateWithString(const wchar_t * _Nonnull leftBrace,
+                                                                                             const wchar_t * _Nonnull rightBrace,
+                                                                                             CFASSFileParsingResultRef _Nonnull parsingResult)
 {
+    DEBUG_ASSERT(leftBrace != NULL && rightBrace != NULL && leftBrace < rightBrace && leftBrace[0] == L'{' && rightBrace[0] == L'}' && parsingResult != NULL);
+    if(leftBrace == NULL || rightBrace == NULL || leftBrace >= rightBrace || leftBrace[0] != L'{' || rightBrace[0] != L'}' || parsingResult == NULL) return NULL;
+    
     CFASSFileDialogueTextContentOverrideRef result;
     if((result = malloc(sizeof(struct CFASSFileDialogueTextContentOverride))) != NULL)
     {
         if((result->contentArray = CFPointerArrayCreateEmpty()) != NULL)
         {
-            const wchar_t *beginPoint = string;
-            const wchar_t *endPoint = NULL;
-            bool checkMark = false;
-            if(isIncludeBraces)
-            {
-                beginPoint++;
-                if(*string == L'{' && *beginPoint=='\\')
-                {
-                    endPoint = beginPoint;
-                    while(*endPoint!=L'}' && *endPoint!=L'\0') endPoint++;
-                    if(*endPoint == L'}')
-                    {
-                        endPoint--;
-                        checkMark = true;
+            if(leftBrace + 1 == rightBrace) return result;      // empty braces
+            
+            bool formatCheck = true;
+            for(const wchar_t *tokenBegin = leftBrace + 1, *tokenEnd; tokenBegin < rightBrace; tokenBegin = tokenEnd + 1) {
+                if(tokenBegin[0] != L'\\') {
+                    PR_ERROR(tokenBegin, L"CFASSFileDialogueTextContentOverrideContent not begin with \\");
+                    formatCheck = false; break;
+                }
+                
+                tokenEnd = tokenBegin;
+                while(tokenEnd + 1 < rightBrace) {  // exact the tokenEnd
+                    if(tokenEnd[1] == L'\\') break;  // exact the tokenEnd
+                    else if(tokenEnd[1] == L'(') {
+                        const wchar_t *braceMatch;
+                        if((braceMatch = CF_match_next_braces(tokenEnd + 1, rightBrace - 1, true)) != NULL)
+                            tokenEnd = braceMatch - 1;  // it is advanced later
+                        else {
+                            PR_ERROR(tokenEnd + 1, L"CFASSFileDialogueTextContentOverrideContent brace match failure");
+                            formatCheck = false; break;
+                        }
                     }
+                    tokenEnd++;
+                }
+                
+                if(formatCheck) {   // [tokenBegin, tokenEnd] just enclosing "\some(1, 2, 3)"
+                    CFASSFileDialogueTextContentOverrideContentRef override;
+                    if((override = CFASSFileDialogueTextContentOverrideContentCreateWithString(tokenBegin, tokenEnd, parsingResult)) != NULL)
+                        CFPointerArrayAddPointer(result->contentArray, override, false);
+                    else PR_ERROR(tokenBegin, L"CFASSFileDialogueTextContentOverrideContent create failed");
                 }
             }
-            else if(*beginPoint=='\\')
-            {
-                endPoint = string + wcslen(string) - 1;
-                checkMark = true;
-            }
-            if(checkMark)
-            {
-                const wchar_t *tokenBegin = beginPoint, *tokenEnd;
-                bool formatCheck = true;
-                do
-                {
-                    tokenEnd = tokenBegin+1;
-                    if(tokenEnd>endPoint)
-                    {
-                        formatCheck = false;
-                        break;
-                    }
-                    while(tokenEnd<endPoint && *tokenEnd!=L'\\' && formatCheck)
-                    {
-                        if(*tokenEnd==L'(')
-                        {
-                            const wchar_t *matchBrace = CF_match_next_braces(tokenEnd, endPoint, true);
-                            if(matchBrace!=NULL)
-                                tokenEnd = matchBrace;
-                            else
-                                formatCheck = false;
-                        }
-                        tokenEnd++;
-                    }
-                    if(formatCheck)
-                    {
-                        if(*tokenEnd==L'\\')
-                            tokenEnd--;
-                        CFASSFileDialogueTextContentOverrideContentRef content;
-                        if((content = CFASSFileDialogueTextContentOverrideContentCreateWithString(tokenBegin, tokenEnd))!=NULL)
-                            CFPointerArrayAddPointer(result->contentArray, content, false);
-                        else
-                            formatCheck = false;
-                        tokenBegin = tokenEnd + 1;
-                    }
-                }while(formatCheck && tokenEnd<endPoint);
-                if(formatCheck)
-                    return result;
-            }
-            size_t arrayLength = CFPointerArrayGetLength(result->contentArray);
-            for(size_t index = 0; index<arrayLength; index++)
+            
+            if(formatCheck) return result;
+            
+            size_t arrayCount = CFPointerArrayGetCount(result->contentArray);
+            for(size_t index = 0; index < arrayCount; index++)
                 CFASSFileDialogueTextContentOverrideContentDestory
                 ((CFASSFileDialogueTextContentOverrideContentRef)CFPointerArrayGetPointerAtIndex(result->contentArray, index));
             CFPointerArrayDestory(result->contentArray);
@@ -240,3 +224,5 @@ CFASSFileDialogueTextContentOverrideRef CFASSFileDialogueTextContentOverrideCrea
     }
     return NULL;
 }
+
+CLANG_DIAGNOSTIC_POP

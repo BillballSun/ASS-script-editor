@@ -15,6 +15,8 @@
 #include "CFGeometry.h"
 #include "CFException.h"
 #include "CFStringTool.h"
+#include "CFMacro.h"
+#include "CFEnumerator.h"
 
 /* Add new Change note:
  * 1. create change function
@@ -255,6 +257,27 @@ void CFASSFileChangeDestory(CFASSFileChangeRef change)
     if(change->type & CFASSFileChangeTypeFontName)
         free(change->fontName.fontName);
     free(change);
+}
+
+CFASSFileChangeRef CFASSFileChangeCombineFromArray(CFPointerArrayRef array, bool transferOwnershipOfChangesInArrayIfCombinationSuccess) {
+    DEBUG_ASSERT(array != NULL); if (array == NULL) return NULL;
+    CFEnumeratorRef enumerator;
+    if((enumerator = CFEnumeratorCreateFromArray(array)) != NULL) {
+        CFASSFileChangeRef result;
+        if((result = CFASSFileChangeEmpty()) != NULL) {
+            CFASSFileChangeRef eachChange;
+            while ((eachChange = CFEnumeratorNextObject(enumerator)) != NULL)
+                CFASSFileChangeCombineInto(result, eachChange);
+            if(transferOwnershipOfChangesInArrayIfCombinationSuccess) {
+                size_t count = CFPointerArrayGetCount(array);
+                for(size_t index = 0; index < count; index++)
+                    CFASSFileChangeDestory(CFPointerArrayGetPointerAtIndex(array, index));
+            }
+            return result;
+        }
+        CFEnumeratorDestory(enumerator);
+    }
+    return NULL;
 }
 
 CFASSFileChangeRef CFASSFileMultiChangeCombineTermiateWithNULL(bool transferOwnershipIfCombinationSuccess, CFASSFileChangeRef change1, ...)

@@ -22,6 +22,7 @@
 #include "CFASSFileDialogueTextContentOverride.h"
 #include "CFASSFileChange.h"
 #include "CFASSFileControl.h"
+#include "CFCrossPlatform.h"
 
 #include "CFASSFile_Private.h"
 #include "CFASSFileScriptInfo_Private.h"

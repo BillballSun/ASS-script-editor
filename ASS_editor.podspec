@@ -16,7 +16,8 @@ Pod::Spec.new do |spec|
   spec.homepage     = "https://github.com/BillballSun/ASS-script-editor"
   spec.license      = "Apache License, Version 2.0"
   spec.author       = { "Bill Sun" => "captainallredbillball@gmail.com" }
-spec.source       = { :git => 'https://github.com/BillballSun/ASS-script-editor.git', :branch => 'master' }
+  spec.source       = { :path => '.' }
+  spec.dependency 'CACoreFoundation/Core'
 
   # target requirement
   spec.ios.deployment_target = "8.0"
@@ -28,7 +29,7 @@ spec.source       = { :git => 'https://github.com/BillballSun/ASS-script-editor.
   spec.preserve_path = 'ReadMe.rtf'
 
   spec.subspec 'Core' do |sub|
-    sub.requires_arc = false
+    sub.requires_arc = true
     sub.source_files = 'Core/**/*.{h,c,m,mm}'
     sub.public_header_files = 'Core/**/*.h'
   end

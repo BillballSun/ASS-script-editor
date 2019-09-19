@@ -13,18 +13,18 @@
 #include <stdio.h>
 
 typedef enum {
-    CFASSFileControlErrorHandlingIgnore = 1 << 0,   // if this bit set, if ASSFile encounter error in FILE creation, it will try best to ignore the error.
-    CFASSFileControlErrorHandlingOutput = 1 << 1,   // if this bit set, ASSFile will output the error to the Handling stream
-} CFASSFileControlErrorHandling;
+    CFASSFileControlLevelIgnore = 1 << 0,
+    // if this bit set, CFASSFile will try its best to ignore some errors
+    // with auto fixed
+    CFASSFileControlLevelDetail = 1 << 1,
+    // by default, only when encounter error (unrecoverable) will be listed
+    // in parsing result, this shows all kind of warning or auto-correct info
+}   CFASSFileControlLevel;
 
-CFASSFileControlErrorHandling CFASSFileControlGetErrorHandling(void);
+#pragma mark - Control Level
 
-void CFASSFileControlSetErrorHandling(CFASSFileControlErrorHandling errorHandleFlags);
+CFASSFileControlLevel CFASSFileControlGetLevel(void);
 
-bool CFASSFileRedirectErrorInfomation(FILE *fp);
-// if success, return true
-
-bool CFASSFileUnRedirectErrorInfomation(void);
-// if success, return true
+void CFASSFileControlSetLevel(CFASSFileControlLevel level);
 
 #endif /* CFASSFileControl_h */

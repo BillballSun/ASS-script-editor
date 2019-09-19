@@ -9,23 +9,34 @@
 #ifndef CFASSFileDialogueText_Private_h
 #define CFASSFileDialogueText_Private_h
 
+#include "CFASSFileDialogueText.h"
+#include "CFASSFileParsingResult.h"
+#include "CFMacro.h"
+
+CLANG_ASSUME_NONNULL_BEGIN
+
 #pragma mark - Read File
 
-CFASSFileDialogueTextRef CFASSFileDialogueTextCreateWithString(const wchar_t *source);
-/* source */
-// begin with current text filed
-/* Discussion */
-// this function should handle the empty source, that is point to '\n' or '\0'
-
+/*!
+ @function CFASSFileDialogueTextCreateWithString
+ @abstract parsing string for a dialogueText object
+ @param source a string just point to the content ended with '\0' or '\\n'
+        any prefix ','
+ @param parsingResult [ownership not transferred]
+ @return a valid dialogue object, or NULL if error encountered
+ */
+CFASSFileDialogueTextRef CFASSFileDialogueTextCreateWithString(const wchar_t * _Nonnull source,
+                                                               CFASSFileParsingResultRef _Nonnull parsingResult);
 #pragma mark - Store Result
 
-int CFASSFileDialogueTextStoreStringResult(CFASSFileDialogueTextRef text, wchar_t * targetPoint);
-/* targetPoint */
-// this could be NULL
-/* Return */
-// if anything went wrong, function return -1
-// if targetPoint is NULL, it will not try to store string in it
-// return will be the store string Length if targetPoint is long enough even is NULL
-// this will count until the '\n', so it will store the last '\n'
+/*!
+ @function CFASSFileDialogueTextStoreStringResult
+ @param targetPoint it size should be large enough to store result, passing NULL
+        to first query for size
+ @return the actually size needed to store string
+ */
+int CFASSFileDialogueTextStoreStringResult(CFASSFileDialogueTextRef _Nonnull text, wchar_t * _Nullable targetPoint);
+
+CLANG_ASSUME_NONNULL_END
 
 #endif /* CFASSFileDialogueText_Private_h */

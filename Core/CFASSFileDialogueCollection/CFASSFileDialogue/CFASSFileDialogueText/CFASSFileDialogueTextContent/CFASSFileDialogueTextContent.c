@@ -17,6 +17,9 @@
 #include "CFException.h"
 #include "CFASSFileChange.h"
 #include "CFASSFileChange_Private.h"
+#include "CFASSFileParsingResult.h"
+#include "CFASSFileParsingResult_Macro.h"
+#include "CFMacro.h"
 
 struct CFASSFileDialogueTextContent
 {
@@ -27,6 +30,9 @@ struct CFASSFileDialogueTextContent
         CFASSFileDialogueTextContentOverrideRef override;
     } data;
 };
+
+CLANG_DIAGNOSTIC_PUSH
+CLANG_DIAGNOSTIC_IGNORE_NONNULL
 
 void CFASSFileDialogueTextContentMakeChange(CFASSFileDialogueTextContentRef textContent, CFASSFileChangeRef change)
 {
@@ -125,8 +131,6 @@ CFASSFileDialogueTextContentRef CFASSFileDialogueTextContentCopy(CFASSFileDialog
     return NULL;
 }
 
-static bool CFASSFileDialogueTextContentTextIsSkip(wchar_t test);
-
 int CFASSFileDialogueTextContentStoreStringResult(CFASSFileDialogueTextContentRef textContent, wchar_t *targetPoint)
 {
     if(textContent->type == CFASSFileDialogueTextContentTypeText)
@@ -170,44 +174,38 @@ CFASSFileDialogueTextContentRef CFASSFileDialogueTextContentCreateEmptyString(vo
 }
 
 CFASSFileDialogueTextContentRef CFASSFileDialogueTextContentCreateWithString(CFASSFileDialogueTextContentType type,
-                                                                             const wchar_t *data,
-                                                                             const wchar_t *endPoint)
+                                                                             const wchar_t * _Nonnull beginPoint,
+                                                                             const wchar_t * _Nonnull endPoint,
+                                                                             CFASSFileParsingResultRef _Nonnull parsingResult)
 {
+    DEBUG_ASSERT(beginPoint != NULL && endPoint != NULL && beginPoint <= endPoint && parsingResult != NULL);
+    if(beginPoint == NULL || endPoint == NULL || beginPoint > endPoint || parsingResult == NULL) return NULL;
+    
     CFASSFileDialogueTextContentRef result;
     if((result = malloc(sizeof(struct CFASSFileDialogueTextContent))) != NULL)
     {
         switch(type)
         {
             case CFASSFileDialogueTextContentTypeText:
-                if((result->data.text =
-                    CF_allocate_wchar_string_with_endPoint_skip_terminate(data,
-                                                                          endPoint,
-                                                                          CFASSFileDialogueTextContentTextIsSkip,
-                                                                          NULL)) != NULL)
-                {
+                if((result->data.text = malloc(sizeof(wchar_t) * (endPoint - beginPoint + 1 + 1))) != NULL) {
+                    wmemcpy(result->data.text, beginPoint, endPoint - beginPoint + 1);
+                    result->data.text[endPoint - beginPoint + 1] = L'\0';
                     result->type = CFASSFileDialogueTextContentTypeText;
                     return result;
-                }
+                } else PR_INFO(NULL, L"CFASSFileDialogueTextContent(Text) allocation failed");
                 break;
             case CFASSFileDialogueTextContentTypeOverride:
-                if(*data == L'{')
+                if((result->data.override = CFASSFileDialogueTextContentOverrideCreateWithString(beginPoint, endPoint, parsingResult)) != NULL)
                 {
-                    wchar_t *temp = wcschr(data, L'}');
-                    if(temp!=NULL && temp<=endPoint)
-                        if((result->data.override = CFASSFileDialogueTextContentOverrideCreateWithString(data, true)) != NULL)
-                        {
-                            result->type = CFASSFileDialogueTextContentTypeOverride;
-                            return result;
-                        }
-                }
+                    result->type = CFASSFileDialogueTextContentTypeOverride;
+                    return result;
+                } else PR_ERROR(beginPoint, L"CFASSFileDialogueTextContent(Override) create failed");
                 break;
+            default: DEBUG_POINT; break;
         }
         free(result);
-    }
+    } else PR_INFO(NULL, L"CFASSFileDialogueTextContent allocation failed");
     return NULL;
 }
 
-static bool CFASSFileDialogueTextContentTextIsSkip(wchar_t test)
-{
-    return test == L'{';
-}
+CLANG_DIAGNOSTIC_POP

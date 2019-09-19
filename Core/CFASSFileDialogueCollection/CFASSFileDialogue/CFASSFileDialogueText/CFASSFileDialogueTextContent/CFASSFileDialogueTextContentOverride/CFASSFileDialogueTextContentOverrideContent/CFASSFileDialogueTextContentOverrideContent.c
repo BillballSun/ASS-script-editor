@@ -17,7 +17,10 @@
 #include "CFASSFileChange_Private.h"
 #include "CFASSFileDialogueTextDrawingContext.h"
 #include "CFASSFileDialogueTextDrawingContext_Private.h"
-
+#include "CFASSFileParsingResult.h"
+#include "CFASSFileParsingResult_Macro.h"
+#include "CFASSFileControl.h"
+#include "CFMacro.h"
 
 struct CFASSFileDialogueTextContentOverrideContent {
     CFASSFileDialogueTextContentOverrideContentType type;
@@ -41,13 +44,13 @@ struct CFASSFileDialogueTextContentOverrideContent {
         }strikeOut;
         struct
         {
-            bool usingComplexed;
+            bool usingComplexed;        // using specific axis X Y
             CF2DAxis axis;
             double resolutionPixels;    // non-negative
         }border;
         struct
         {
-            bool usingComplexed;
+            bool usingComplexed;    // using specific axis X Y
             CF2DAxis axis;
             double depth;           // non-negative
         }shadow;
@@ -75,7 +78,7 @@ struct CFASSFileDialogueTextContentOverrideContent {
         } spacing;
         struct
         {
-            bool usingComplexed;
+            bool usingComplexed;    // using specific axis X Y Z
             CF3DAxis axis;
             int degrees;
         } rotation;
@@ -90,7 +93,7 @@ struct CFASSFileDialogueTextContentOverrideContent {
         }fontEncoding;
         struct
         {
-            bool usingComplexed;
+            bool usingComplexed;        // using specific number [1,2,3,4] stand for [primary, secondary, outline, back] but prepare for even further print, and input constraint
             unsigned int componentNumber;
             unsigned char blue, green, red;
         } color;
@@ -171,9 +174,9 @@ struct CFASSFileDialogueTextContentOverrideContent {
     } data;
 };
 
-static bool CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(const wchar_t *contentString,
-                                                                              const wchar_t *endPoint,
-                                                                              const wchar_t *matchAlpha);
+static bool CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(const wchar_t * _Nonnull tokenBegin,
+                                                                              const wchar_t * _Nonnull tokenEnd,
+                                                                              const wchar_t * _Nonnull matchTypeString);
 
 static bool CFASSFileDialogueTextContentOverrideContentCheckAnimationModifierSupport(CFASSFileDialogueTextContentOverrideContentRef content);
 
@@ -181,740 +184,1016 @@ static bool CFASSFileDialogueTextContentOverrideContentCheckAnimationModifiers(w
 
 #pragma mark - Translation between strings
 
-CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverrideContentCreateWithString(const wchar_t *contentString, const wchar_t *endPoint)
+CFASSFileDialogueTextContentOverrideContentRef CFASSFileDialogueTextContentOverrideContentCreateWithString(const wchar_t * _Nonnull tokenBegin,
+                                                                                                           const wchar_t * _Nullable tokenEnd,
+                                                                                                           CFASSFileParsingResultRef _Nonnull parsingResult)
 {
-    if(contentString != NULL)
+    DEBUG_ASSERT(tokenBegin != NULL && parsingResult != NULL);
+    if(tokenBegin == NULL || parsingResult == NULL) return NULL;
+    if(tokenEnd != NULL && tokenEnd < tokenBegin) return NULL;
+    
+    CFASSFileDialogueTextContentOverrideContentRef result;
+    if((result = malloc(sizeof(struct CFASSFileDialogueTextContentOverrideContent))) != NULL)
     {
-        CFASSFileDialogueTextContentOverrideContentRef result;
-        if((result = malloc(sizeof(struct CFASSFileDialogueTextContentOverrideContent))) != NULL)
+        CFASSFileControlLevel controlLevel = CFASSFileControlGetLevel();
+        
+        int temp;
+        if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* italic */
+                                                                             tokenEnd,
+                                                                             L"i"))
         {
-            int temp;
-            if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* italic */
-                                                                                 endPoint,
-                                                                                 L"i"))
-            {
-                int isItalic;
-                temp = swscanf(contentString, L"\\i%d", &isItalic);
-                if(temp == 1 && isItalic>=0 && isItalic<=1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeItalic;
-                    result->data.italic.isItalic = isItalic;
-                    return result;
+            int isItalic;
+            if((temp = swscanf(tokenBegin, L"\\i%d", &isItalic)) == 1) {
+                if(isItalic != 0 && isItalic != 1) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        isItalic = 1;   // as is non-zero
+                        PR_WARN(tokenBegin, L"unkown italic value, auto-corrected to 1");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"unkown italic value");
+                        goto LABEL_failure;
+                    }
                 }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeItalic;
+                result->data.italic.isItalic = isItalic;
+                return result;
+            } else PR_ERROR(tokenBegin, L"italic match failure, patten \"\\i%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* blod */
+                                                                                  tokenEnd,
+                                                                                  L"b"))
+        {
+            int weight;
+            if((temp = swscanf(tokenBegin, L"\\b%d", &weight)) == 1) {
+                if(weight < 0) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        weight = 16;
+                        PR_WARN(tokenBegin, L"unkown blod value, auto-corrected to 16");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"unkown blod value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeBlod;
+                result->data.blod.weight = weight;
+                return result;
+            } else PR_ERROR(tokenBegin, L"blod match failure, patten \"\\b%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* underline */
+                                                                                  tokenEnd,
+                                                                                  L"u"))
+        {
+            int isUnderline;
+            if((temp = swscanf(tokenBegin, L"\\u%d", &isUnderline)) == 1) {
+                if(isUnderline != 0 && isUnderline != 1) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        isUnderline = 1;
+                        PR_WARN(tokenBegin, L"unkown underline value, auto-corrected to 1");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"unkown underline value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeUnderline;
+                result->data.underline.isUnderline = isUnderline;
+                return result;
+            } else PR_ERROR(tokenBegin, L"underline match failure, patten \"\\u%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* strikeOut */
+                                                                                  tokenEnd,
+                                                                                  L"s"))
+        {
+            int isStrikeOut;
+            if((temp = swscanf(tokenBegin, L"\\s%d", &isStrikeOut)) == 1) {
+                if(isStrikeOut != 0 && isStrikeOut != 1) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        isStrikeOut = 1;
+                        PR_WARN(tokenBegin, L"unkown strikeOut value, auto-corrected to 1");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"unkown strikeOut value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeStrikeOut;
+                result->data.strikeOut.isStrikeOut = isStrikeOut;
+                return result;
+            } else PR_ERROR(tokenBegin, L"strikeOut match failure, patten \"\\s%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* bord */
+                                                                                  tokenEnd,
+                                                                                  L"bord") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* bord x */
+                                                                                  tokenEnd,
+                                                                                  L"xbord") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* bord y */
+                                                                                  tokenEnd,
+                                                                                  L"ybord"))
+        {
+            double borderSize;
+            result->data.border.usingComplexed = true;  // this means using specific X, Y axis
+            
+            if((temp = swscanf(tokenBegin, L"\\bord%lf", &borderSize)) == 1)
+                result->data.border.usingComplexed = false;
+            else if((temp = swscanf(tokenBegin, L"\\xbord%lf", &borderSize)) == 1)
+                result->data.border.axis = CF2DAxisX;
+            else if((temp = swscanf(tokenBegin, L"\\ybord%lf", &borderSize)) == 1)
+                result->data.border.axis = CF2DAxisY;
+            
+            if(temp == 1)
+            {
+                if(borderSize < 0.0) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        borderSize = 0.0;
+                        PR_WARN(tokenBegin, L"unacceptable borderSize value, auto-corrected to 0.0");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"unacceptable borderSize value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeBorder;
+                result->data.border.resolutionPixels = borderSize;
+                return result;
+            } else PR_ERROR(tokenBegin, L"bord match failure, patten \"\\[x/y]bord%%lf\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* shadow */
+                                                                                  tokenEnd,
+                                                                                  L"shad") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* shadow x */
+                                                                                  tokenEnd,
+                                                                                  L"xshad") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* shadow y */
+                                                                                  tokenEnd,
+                                                                                  L"yshad"))
+        {
+            double shadowDepth;
+            result->data.shadow.usingComplexed = true;  // this means using specific X, Y axis
+            
+            if((temp = swscanf(tokenBegin, L"\\shad%lf", &shadowDepth)) == 1)
+                result->data.shadow.usingComplexed = false;
+            else if((temp = swscanf(tokenBegin, L"\\xshad%lf", &shadowDepth)) == 1)
+                result->data.shadow.axis = CF2DAxisX;
+            else if((temp = swscanf(tokenBegin, L"\\yshad%lf", &shadowDepth)) == 1)
+                result->data.shadow.axis = CF2DAxisY;
+            
+            if(temp == 1)
+            {
+                if(shadowDepth < 0.0) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        shadowDepth = 0.0;
+                        PR_WARN(tokenBegin, L"unacceptable shadowDepth value, auto-corrected to 0.0");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"unacceptable shadowDepth value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeShadow;
+                result->data.shadow.depth = shadowDepth;
+                return result;
+            } else PR_ERROR(tokenBegin, L"shadowDepth match failure, patten \"\\[x/y]shad%%lf\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* legacy blur */
+                                                                                  tokenEnd,
+                                                                                  L"be") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* guassian blur */
+                                                                                  tokenEnd,
+                                                                                  L"blur"))
+        {
+            int strength;
+            
+            if((temp = swscanf(tokenBegin, L"\\be%d", &strength)) == 1)
+                result->data.blurEdge.usingGuassian = false;
+            else if((temp = swscanf(tokenBegin, L"\\blur%d", &strength)) == 1)
+                result->data.blurEdge.usingGuassian = true;
+            
+            if(temp == 1)
+            {
+                if(strength < 0) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        strength = 0;
+                        PR_WARN(tokenBegin, L"unacceptable blur value, auto-corrected to 0");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"unacceptable blur value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeBlurEdge;
+                result->data.blurEdge.strength = strength;
+                return result;
+            } else PR_ERROR(tokenBegin, L"blur match failure, patten \"\\(be/blur)%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* font size */
+                                                                                  tokenEnd,
+                                                                                  L"fs"))
+        {
+            int resolutionPixels;
+            if((temp = swscanf(tokenBegin, L"\\fs%d", &resolutionPixels)) == 1)
+            {
+                if(resolutionPixels < 0) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        resolutionPixels = 0;
+                        PR_WARN(tokenBegin, L"unacceptable fontSize value, auto-corrected to 0");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"unacceptable fontSize value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeFontSize;
+                result->data.fontSize.resolutionPixels = resolutionPixels;
+                return result;
+            } else PR_ERROR(tokenBegin, L"fontSize match failure, patten \"\\fs%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* font scale x */
+                                                                                  tokenEnd,
+                                                                                  L"fscx") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* font scale y */
+                                                                                  tokenEnd,
+                                                                                  L"fscy"))
+        {
+            int percentage;
+            if((temp = swscanf(tokenBegin, L"\\fscx%d", &percentage)) == 1)
+                result->data.fontScale.axis = CF2DAxisX;
+            else if((temp = swscanf(tokenBegin, L"\\fscy%d", &percentage)) == 1)
+                result->data.fontScale.axis = CF2DAxisY;
+            
+            if(temp == 1)
+            {
+                if(percentage < 0) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        percentage = 100;
+                        PR_WARN(tokenBegin, L"unacceptable fontScale value, auto-corrected to 100");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"unacceptable fontScale value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeFontScale;
+                result->data.fontScale.percentage = percentage;
+                return result;
+            } else PR_ERROR(tokenBegin, L"fontScale match failure, patten \"\\fsc(x/y)%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* text spacing */
+                                                                                  tokenEnd,
+                                                                                  L"fsp"))
+        {
+            double resolutionPixels;
+            if((temp = swscanf(tokenBegin, L"\\fsp%lf", &resolutionPixels)) == 1)
+            {
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeFontSpacing;
+                result->data.spacing.resolutionPixels = resolutionPixels;
+                return result;
+            } else PR_ERROR(tokenBegin, L"textSpacing match failure, patten \"\\fsp%%lf\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* rotation default */
+                                                                                  tokenEnd,
+                                                                                  L"fr") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* rotation x */
+                                                                                  tokenEnd,
+                                                                                  L"frx") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* rotation y */
+                                                                                  tokenEnd,
+                                                                                  L"fry")  ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* rotation z */
+                                                                                  tokenEnd,
+                                                                                  L"frz"))
+        {
+            int degrees;
+            result->data.rotation.usingComplexed = true;
+            if((temp = swscanf(tokenBegin, L"\\fr%d", &degrees)) == 1)
+                result->data.rotation.usingComplexed = false;
+            else if((temp = swscanf(tokenBegin, L"\\frx%d", &degrees)) == 1)
+                result->data.rotation.axis = CF3DAxisX;
+            else if((temp = swscanf(tokenBegin, L"\\fry%d", &degrees)) == 1)
+                result->data.rotation.axis = CF3DAxisY;
+            else if((temp = swscanf(tokenBegin, L"\\frz%d", &degrees)) == 1)
+                result->data.rotation.axis = CF3DAxisZ;
+            if(temp == 1)
+            {
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeTextRotation;
+                result->data.rotation.degrees = degrees;
+                return result;
+            } else PR_ERROR(tokenBegin, L"rotation match failure, patten \"\\fr[x/y/z]%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* text shearing x */
+                                                                                  tokenEnd,
+                                                                                  L"fax") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* text shearing y */
+                                                                                  tokenEnd,
+                                                                                  L"fay"))
+        {
+            double factor;
+            if((temp = swscanf(tokenBegin, L"\\fax%lf", &factor)) == 1)
+                result->data.shearing.axis = CF2DAxisX;
+            else if((temp = swscanf(tokenBegin, L"\\fay%lf", &factor)) == 1)
+                result->data.shearing.axis = CF2DAxisY;
+            if(temp == 1)
+            {
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeTextShearing;
+                result->data.shearing.factor = factor;
+                return result;
+            } else PR_ERROR(tokenBegin, L"text shearing match failure, patten \"\\fa(x/y)%%lf\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* font encoding */
+                                                                                  tokenEnd,
+                                                                                  L"fe"))
+        {
+            int identifier;
+            if((temp = swscanf(tokenBegin, L"\\fe%d", &identifier)) == 1)
+            {
+                if(identifier < 0) {
+                    PR_ERROR(tokenBegin, L"unacceptable fontEncoding value");
+                    goto LABEL_failure;
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeTextEncoding;
+                result->data.fontEncoding.identifier = identifier;
+                return result;
+            } else PR_ERROR(tokenBegin, L"fontEncoding match failure, patten \"\\fe%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* color default */
+                                                                                  tokenEnd,
+                                                                                  L"c") ||
+                CF_wchar_string_match_beginning(tokenBegin, L"\\1c") ||
+                CF_wchar_string_match_beginning(tokenBegin, L"\\2c") ||
+                CF_wchar_string_match_beginning(tokenBegin, L"\\3c") ||
+                CF_wchar_string_match_beginning(tokenBegin, L"\\4c"))
+        {
+            int componentNumber;
+            unsigned long colorInfo;    // B G R
+            bool checkMark = false;
+            if((temp = swscanf(tokenBegin, L"\\c&H%lx&", &colorInfo)) == 1)
+            {
+                result->data.color.usingComplexed = false;
+                result->data.color.componentNumber = 0u;
+                checkMark = true;
             }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* blod */
-                                                                                      endPoint,
-                                                                                      L"b"))
-            {
-                int weight;
-                temp = swscanf(contentString, L"\\b%d", &weight);
-                if(temp == 1 && weight>=0)
+            else if((temp = swscanf(tokenBegin, L"\\%dc&H%lx&", &componentNumber, &colorInfo)) == 2)
+                if(componentNumber >= 1 && componentNumber <= 4)
                 {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeBlod;
-                    result->data.blod.weight = weight;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* underline */
-                                                                                      endPoint,
-                                                                                      L"u"))
-            {
-                int isUnderline;
-                temp = swscanf(contentString, L"\\u%d", &isUnderline);
-                if(temp == 1 && isUnderline>=0 && isUnderline<=1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeUnderline;
-                    result->data.underline.isUnderline = isUnderline;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* strikeOut */
-                                                                                      endPoint,
-                                                                                      L"s"))
-            {
-                int isStrikeOut;
-                temp = swscanf(contentString, L"\\s%d", &isStrikeOut);
-                if(temp == 1 && isStrikeOut>=0 && isStrikeOut<=1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeStrikeOut;
-                    result->data.strikeOut.isStrikeOut = isStrikeOut;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* bord */
-                                                                                      endPoint,
-                                                                                      L"bord") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* bord x */
-                                                                                      endPoint,
-                                                                                      L"xbord") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* bord y */
-                                                                                      endPoint,
-                                                                                      L"ybord"))
-            {
-                double borderSize;
-                if((temp = swscanf(contentString, L"\\bord%lf", &borderSize)) == 1)
-                    result->data.border.usingComplexed = false;
-                else if((temp = swscanf(contentString, L"\\xbord%lf", &borderSize)) == 1)
-                    result->data.border.axis = CF2DAxisX;
-                else if((temp = swscanf(contentString, L"\\ybord%lf", &borderSize)) == 1)
-                    result->data.border.axis = CF2DAxisY;
-                if(temp == 1 && borderSize>=0)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeBorder;
-                    result->data.border.resolutionPixels = borderSize;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* shadow */
-                                                                                      endPoint,
-                                                                                      L"shad") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* shadow x */
-                                                                                      endPoint,
-                                                                                      L"xshad") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* shadow y */
-                                                                                      endPoint,
-                                                                                      L"yshad"))
-            {
-                double shadowDepth;
-                if((temp = swscanf(contentString, L"\\shad%lf", &shadowDepth)) == 1)
-                    result->data.shadow.usingComplexed = false;
-                else if((temp = swscanf(contentString, L"\\xshad%lf", &shadowDepth)) == 1)
-                    result->data.shadow.axis = CF2DAxisX;
-                else if((temp = swscanf(contentString, L"\\yshad%lf", &shadowDepth)) == 1)
-                    result->data.shadow.axis = CF2DAxisY;
-                if(temp == 1 && shadowDepth>=0)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeShadow;
-                    result->data.shadow.depth = shadowDepth;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* legacy blur */
-                                                                                      endPoint,
-                                                                                      L"be") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* guassian blur */
-                                                                                      endPoint,
-                                                                                      L"blur"))
-            {
-                unsigned int strength;
-                if((temp = swscanf(contentString, L"\\be%u", &strength)) == 1)
-                    result->data.blurEdge.usingGuassian = false;
-                else if((temp = swscanf(contentString, L"\\blur%u", &strength)) == 1)
-                    result->data.blurEdge.usingGuassian = true;
-                if(temp == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeBlurEdge;
-                    result->data.blurEdge.strength = strength;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* font size */
-                                                                                      endPoint,
-                                                                                      L"fs"))
-            {
-                unsigned int resolutionPixels;
-                if((temp = swscanf(contentString, L"\\fs%u", &resolutionPixels)) == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeFontSize;
-                    result->data.fontSize.resolutionPixels = resolutionPixels;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* font scale x */
-                                                                                      endPoint,
-                                                                                      L"fscx") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* font scale y */
-                                                                                      endPoint,
-                                                                                      L"fscy"))
-            {
-                unsigned int percentage;
-                if((temp = swscanf(contentString, L"\\fscx%u", &percentage)) == 1)
-                    result->data.fontScale.axis = CF2DAxisX;
-                else if((temp = swscanf(contentString, L"\\fscy%u", &percentage)) == 1)
-                    result->data.fontScale.axis = CF2DAxisY;
-                if(temp == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeFontScale;
-                    result->data.fontScale.percentage = percentage;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* text spacing */
-                                                                                      endPoint,
-                                                                                      L"fsp"))
-            {
-                double resolutionPixels;
-                if((temp = swscanf(contentString, L"\\fsp%lf", &resolutionPixels)) == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeFontSpacing;
-                    result->data.spacing.resolutionPixels = resolutionPixels;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* rotation default */
-                                                                                      endPoint,
-                                                                                      L"fr") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* rotation x */
-                                                                                      endPoint,
-                                                                                      L"frx") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* rotation y */
-                                                                                      endPoint,
-                                                                                      L"fry")  ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* rotation z */
-                                                                                      endPoint,
-                                                                                      L"frz"))
-            {
-                int degrees;
-                if((temp = swscanf(contentString, L"\\fr%d", &degrees)) == 1)
-                    result->data.rotation.usingComplexed = true;
-                else if((temp = swscanf(contentString, L"\\frx%d", &degrees)) == 1)
-                {
-                    result->data.rotation.usingComplexed = false;
-                    result->data.rotation.axis = CF3DAxisX;
-                }
-                else if((temp = swscanf(contentString, L"\\fry%d", &degrees)) == 1)
-                {
-                    result->data.rotation.usingComplexed = false;
-                    result->data.rotation.axis = CF3DAxisY;
-                }
-                else if((temp = swscanf(contentString, L"\\frz%d", &degrees)) == 1)
-                {
-                    result->data.rotation.usingComplexed = false;
-                    result->data.rotation.axis = CF3DAxisZ;
-                }
-                if(temp == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeTextRotation;
-                    result->data.rotation.degrees = degrees;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* text shearing x */
-                                                                                      endPoint,
-                                                                                      L"fax") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* text shearing y */
-                                                                                      endPoint,
-                                                                                      L"fay"))
-            {
-                double factor;
-                if((temp = swscanf(contentString, L"\\fax%lf", &factor)) == 1)
-                    result->data.shearing.axis = CF2DAxisX;
-                else if((temp = swscanf(contentString, L"\\fay%lf", &factor)) == 1)
-                    result->data.shearing.axis = CF2DAxisY;
-                if(temp == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeTextShearing;
-                    result->data.shearing.factor = factor;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* font encoding */
-                                                                                      endPoint,
-                                                                                      L"fe"))
-            {
-                unsigned int identifier;
-                if((temp = swscanf(contentString, L"\\fe%u", &identifier)) == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeTextEncoding;
-                    result->data.fontEncoding.identifier = identifier;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* color default */
-                                                                                      endPoint,
-                                                                                      L"c") ||
-                    CF_wchar_string_match_beginning(contentString, L"\\1c") ||
-                    CF_wchar_string_match_beginning(contentString, L"\\2c") ||
-                    CF_wchar_string_match_beginning(contentString, L"\\3c") ||
-                    CF_wchar_string_match_beginning(contentString, L"\\4c"))
-            {
-                unsigned int componentNumber;
-                unsigned long colorInfo;    // B G R
-                bool checkMark = false;
-                if((temp = swscanf(contentString, L"\\c&H%lx&", &colorInfo)) == 1)
-                {
-                    result->data.color.usingComplexed = false;
-                    result->data.color.componentNumber = 0u;
+                    result->data.color.usingComplexed = true;
+                    result->data.color.componentNumber = componentNumber;
                     checkMark = true;
                 }
-                else if((temp = swscanf(contentString, L"\\%uc&H%lx&", &componentNumber, &colorInfo)) == 2)
-                    if(componentNumber>=1 && componentNumber<=4)
-                    {
-                        result->data.color.usingComplexed = true;
-                        result->data.color.componentNumber = componentNumber;
-                        checkMark = true;
-                    }
-                if(checkMark && colorInfo<=0xFFFFFF)
+            
+            if(!checkMark) {
+                PR_ERROR(tokenBegin, L"color match failure, patten \"\\[1/2/3/4]c&H%%lx&\"");
+            }
+            else if(colorInfo > 0xFFFFFF) {
+                PR_ERROR(tokenBegin, L"color match exceed max value 0xFFFFFF");
+            }
+            else
+            {
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeColor;
+                result->data.color.red = colorInfo % (0xFF + 1);
+                colorInfo /= (0xFF + 1);
+                result->data.color.green = colorInfo % (0xFF + 1);
+                colorInfo /= (0xFF + 1);
+                result->data.color.blue = colorInfo % (0xFF + 1);
+                return result;
+            }
+            
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* alpha all */
+                                                                                  tokenEnd,
+                                                                                  L"alpha") ||
+                CF_wchar_string_match_beginning(tokenBegin, L"\\1a")  ||                           /* alpha 1 */
+                CF_wchar_string_match_beginning(tokenBegin, L"\\2a")  ||                           /* alpha 1 */
+                CF_wchar_string_match_beginning(tokenBegin, L"\\3a")  ||                           /* alpha 1 */
+                CF_wchar_string_match_beginning(tokenBegin, L"\\4a"))                              /* alpha 1 */
+        {
+            int componentNumber;
+            unsigned int transparent_uint;
+            if((temp = swscanf(tokenBegin, L"\\alpha&H%X&", &transparent_uint)) == 1)
+            {
+                if(transparent_uint <= 0xFF)
                 {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeColor;
-                    result->data.color.red = colorInfo % (0xFF+1);
-                    colorInfo /= (0xFF+1);
-                    result->data.color.green = colorInfo % (0xFF+1);
-                    colorInfo /= (0xFF+1);
-                    result->data.color.blue = colorInfo % (0xFF+1);
+                    result->type = CFASSFileDialogueTextContentOverrideContentTypeAlpha;
+                    result->data.alpha.setAllComponent = true;
+                    result->data.alpha.componentNumber = 0;
+                    result->data.alpha.transparent = transparent_uint;
                     return result;
+                } else PR_ERROR(tokenBegin, L"alpha exceed range limit [0 .. 0xFF]");
+            }
+            else if((temp = swscanf(tokenBegin, L"\\%da&H%X&", &componentNumber, &transparent_uint)) == 2) {
+                if(transparent_uint <= 0xFF && componentNumber >= 1 && componentNumber <= 4)
+                {
+                    result->type = CFASSFileDialogueTextContentOverrideContentTypeAlpha;
+                    result->data.alpha.setAllComponent = false;
+                    result->data.alpha.componentNumber = componentNumber;
+                    result->data.alpha.transparent = transparent_uint;
+                    return result;
+                } else PR_ERROR(tokenBegin, L"alpha exceed limit a(1-4) [0 .. 0xFF]");
+            } else PR_ERROR(tokenBegin, L"alpha match failure, patten \"\\[1/2/3/4]a(lpha)&H%%X&\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* alignment legacy */
+                                                                                  tokenEnd,
+                                                                                  L"a") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* alignment numPad style */
+                                                                                  tokenEnd,
+                                                                                  L"an"))
+        {
+            int position;
+            if((temp = swscanf(tokenBegin, L"\\a%d", &position)) == 1)
+                result->data.alignment.legacy = true;
+            else if((temp = swscanf(tokenBegin, L"\\an%d", &position)) == 1)
+                result->data.alignment.legacy = false;
+            
+            if(temp == 1)
+            {
+                if(result->data.alignment.legacy) {
+                    /*
+                        1: Bottom left
+                        2: Bottom center
+                        3: Bottom right
+                        5: Top left
+                        6: Top center
+                        7: Top right
+                        9: Middle left
+                        10: Middle center
+                        11: Middle right
+                     */
+                    if(position != 1 && position != 2 && position != 3 &&
+                       position != 5 && position != 6 && position != 7 &&
+                       position != 9 && position != 10 && position != 11) {
+                        if(controlLevel & CFASSFileControlLevelIgnore) {
+                            position = 6;
+                            PR_WARN(tokenBegin, L"alignment(legacy) unkown value %d, auto-correct to 6(center)", position);
+                        }
+                        else {
+                            PR_ERROR(tokenBegin, L"alignment(legacy) unkown value %d", position);
+                            goto LABEL_failure;
+                        }
+                    }
                 }
+                else {
+                    /*
+                        1: Bottom left
+                        2: Bottom center
+                        3: Bottom right
+                        4: Middle left
+                        5: Middle center
+                        6: Middle right
+                        7: Top left
+                        8: Top center
+                        9: Top right
+                     */
+                    if(position < 1 || position > 9) {
+                        if(controlLevel & CFASSFileControlLevelIgnore) {
+                            position = 5;
+                            PR_WARN(tokenBegin, L"alignment(numPad) unkown value %d, auto-correct to 5(center)", position);
+                        }
+                        else {
+                            PR_ERROR(tokenBegin, L"alignment(numPad) unkown value %d", position);
+                            goto LABEL_failure;
+                        }
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeAlignment;
+                result->data.alignment.position = position;
+                return result;
+            } else PR_ERROR(tokenBegin, L"alignment match failure, patten \"\\a[n]%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* karaoke duration without sweep */
+                                                                                  tokenEnd,
+                                                                                  L"k") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* karaoke duration with sweep */
+                                                                                  tokenEnd,
+                                                                                  L"K") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* karaoke duration with sweep */
+                                                                                  tokenEnd,
+                                                                                  L"kf") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* karaoke duration remove b/s */
+                                                                                  tokenEnd,
+                                                                                  L"ko"))
+        {
+            int sentiSeconds;
+            if((temp = swscanf(tokenBegin, L"\\k%d", &sentiSeconds)) == 1)
+            {
+                result->data.karaokeDuration.hasSweepEffect = false;
+                result->data.karaokeDuration.removeBorderOutlineBeforeHighlight = false;
+            }
+            else if((temp = swscanf(tokenBegin, L"\\K%d", &sentiSeconds)) == 1)
+            {
+                result->data.karaokeDuration.hasSweepEffect = true;
+                result->data.karaokeDuration.removeBorderOutlineBeforeHighlight = false;
+            }
+            else if((temp = swscanf(tokenBegin, L"\\kf%d", &sentiSeconds)) == 1)
+            {
+                result->data.karaokeDuration.hasSweepEffect = true;
+                result->data.karaokeDuration.removeBorderOutlineBeforeHighlight = false;
+            }
+            else if((temp = swscanf(tokenBegin, L"\\ko%d", &sentiSeconds)) == 1)
+            {
+                result->data.karaokeDuration.hasSweepEffect = false;
+                result->data.karaokeDuration.removeBorderOutlineBeforeHighlight = true;
+            }
+            if(temp == 1)
+            {
+                if(sentiSeconds < 0) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        sentiSeconds = 0;
+                        PR_WARN(tokenBegin, L"karaoke unacceptable value, auto-correct to 0");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"karaoke unacceptable value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeKaraokeDuration;
+                result->data.karaokeDuration.sentiSeconds = sentiSeconds;
+                return result;
+            } else PR_ERROR(tokenBegin, L"karaoke match failure, patten \"\\[k/K/kr/ko]%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* Wrap style */
+                                                                                  tokenEnd,
+                                                                                  L"q"))
+        {
+            int style;
+            if((temp = swscanf(tokenBegin, L"\\q%d", &style)) == 1) {
+                if(style < 0 || style > 3) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        style = 0;
+                        PR_WARN(tokenBegin, L"wrapStyle unacceptable value, auto-correct to 0(smart wrap)");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"wrapStyle unacceptable value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeWrapingStyle;
+                result->data.wrapStyle.style = style;
+                return result;
+            } else PR_ERROR(tokenBegin, L"wrapStyle match failure, patten \"\\q%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* position */
+                                                                                  tokenEnd,
+                                                                                  L"pos"))
+        {
+            int x, y;
+            if((temp = swscanf(tokenBegin, L"\\pos(%d,%d)", &x, &y)) == 2)
+            {
+                result->type = CFASSFileDialogueTextContentOverrideContentTypePosition;
+                result->data.position.x = x;
+                result->data.position.y = y;
+                return result;
+            } else PR_ERROR(tokenBegin, L"wrapStyle match failure, patten \"\\pos(%%d,%%d)\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* movement */
+                                                                                  tokenEnd,
+                                                                                  L"move"))
+        {
+            int fromX, fromY, toX, toY;
+            int startFromMS, endFromMS;
+            if((temp = swscanf(tokenBegin, L"\\move(%d,%d,%d,%d,%d,%d)", &fromX, &fromY, &toX, &toY, &startFromMS, &endFromMS)) == 6)
+            {
+                result->data.movement.hasTimeControl = true;
+                result->data.movement.startFromMS = startFromMS;
+                result->data.movement.endFromMS = endFromMS;
+            }
+            else if((temp = swscanf(tokenBegin, L"\\move(%d,%d,%d,%d)", &fromX, &fromY, &toX, &toY)) == 4)
+            {
+                result->data.movement.hasTimeControl = false;
+                result->data.movement.startFromMS = 0;
+                result->data.movement.endFromMS = 0;
+            }
+            else temp = 0;  // indicate match failure
+            
+            if(temp >= 4)
+            {
+                if(result->data.movement.hasTimeControl) {
+                    if(startFromMS < 0 || endFromMS < 0 || startFromMS > endFromMS) {
+                        if(controlLevel & CFASSFileControlLevelIgnore) {
+                            if(startFromMS < 0) startFromMS = 0;
+                            if(endFromMS < 0) endFromMS = 0;
+                            if(startFromMS > endFromMS) startFromMS = endFromMS;
+                            PR_WARN(tokenBegin, L"movement unacceptable value, auto-correct");
+                        }
+                        else {
+                            PR_ERROR(tokenBegin, L"movement unacceptable value");
+                            goto LABEL_failure;
+                        }
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeMove;
+                result->data.movement.fromX = fromX;
+                result->data.movement.fromY = fromY;
+                result->data.movement.toX = toX;
+                result->data.movement.toY = toY;
+                return result;
+            } else PR_ERROR(tokenBegin, L"movement match failure, patten \"\\move(%%d,%%d,%%d,%%d[,%%d,%%d])\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* rotation origin */
+                                                                                  tokenEnd,
+                                                                                  L"org"))
+        {
+            int x, y;
+            if((temp = swscanf(tokenBegin, L"\\org(%d,%d)", &x, &y)) == 2)
+            {
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeRotationOrigin;
+                result->data.rotationOrigin.x = x;
+                result->data.rotationOrigin.y = y;
+                return result;
+            } else PR_ERROR(tokenBegin, L"rotationOrigin match failure, patten \"\\org(%%d,%%d)\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* fade */
+                                                                                  tokenEnd,
+                                                                                  L"fad") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* fade complex */
+                                                                                  tokenEnd,
+                                                                                  L"fade"))
+        {
+            int fadeInMS, fadeOutMS,
+                beginAlpha, middleAlpha, endAlpha,
+                fadeInBeginMS, fadeInEndMS, fadeOutBeginMS, fadeOutEndMS;
+            
+            if((temp = swscanf(tokenBegin, L"\\fad(%d,%d)", &fadeInMS, &fadeOutMS)) == 2)
+            {
+                if(fadeInMS < 0 || fadeOutMS < 0 || fadeInMS > fadeOutMS) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        if(fadeInMS < 0) fadeInMS = 0;
+                        if(fadeOutMS < 0) fadeOutMS = 0;
+                        if(fadeInMS > fadeOutMS) fadeInMS = fadeOutMS;
+                        PR_WARN(tokenBegin, L"fade unacceptable value, auto-correct");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"fade unacceptable value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeFade;
+                result->data.fade.isComplexed = false;
+                result->data.fade.fadeInMS = fadeInMS;
+                result->data.fade.fadeOutMS = fadeOutMS;
+                result->data.fade.beginAlpha = 0;
+                result->data.fade.middleAlpha = 0;
+                result->data.fade.endAlpha = 0;
+                result->data.fade.fadeInBeginMS = 0;
+                result->data.fade.fadeInEndMS = 0;
+                result->data.fade.fadeOutBeginMS = 0;
+                result->data.fade.fadeOutEndMS = 0;
+                return result;
                 
             }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* alpha all */
-                                                                                      endPoint,
-                                                                                      L"alpha") ||
-                    CF_wchar_string_match_beginning(contentString, L"\\1a")  ||                           /* alpha 1 */
-                    CF_wchar_string_match_beginning(contentString, L"\\2a")  ||                           /* alpha 1 */
-                    CF_wchar_string_match_beginning(contentString, L"\\3a")  ||                           /* alpha 1 */
-                    CF_wchar_string_match_beginning(contentString, L"\\4a"))                              /* alpha 1 */
-            {
-                unsigned int componentNumber;
-                unsigned int transparent_uint;
-                if((temp = swscanf(contentString, L"\\alpha&H%X&", &transparent_uint)) == 1)
-                {
-                    if(transparent_uint<= 0xFF)
-                    {
-                        result->type = CFASSFileDialogueTextContentOverrideContentTypeAlpha;
-                        result->data.alpha.setAllComponent = true;
-                        result->data.alpha.componentNumber = 0;
-                        result->data.alpha.transparent = transparent_uint;
-                        return result;
+            else if((temp = swscanf(tokenBegin, L"\\fade(%d,%d,%d,%d,%d,%d,%d)",
+                                    &beginAlpha, &middleAlpha, &endAlpha,
+                                    &fadeInBeginMS, &fadeInEndMS,
+                                    &fadeOutBeginMS, &fadeOutEndMS)) == 7) {
+                if(fadeInMS < 0 || fadeOutMS < 0 || fadeInMS > fadeOutMS) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        if(fadeInMS < 0) fadeInMS = 0;
+                        if(fadeOutMS < 0) fadeOutMS = 0;
+                        if(fadeInMS > fadeOutMS) fadeInMS = fadeOutMS;
+                        PR_WARN(tokenBegin, L"fade unacceptable value, auto-correct");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"fade unacceptable value");
+                        goto LABEL_failure;
                     }
                 }
-                else if((temp = swscanf(contentString, L"\\%ua&H%X&", &componentNumber, &transparent_uint)) == 2)
-                    if(transparent_uint<= 0xFF && componentNumber>=1 && componentNumber<=4)
-                    {
-                        result->type = CFASSFileDialogueTextContentOverrideContentTypeAlpha;
-                        result->data.alpha.setAllComponent = false;
-                        result->data.alpha.componentNumber = componentNumber;
-                        result->data.alpha.transparent = transparent_uint;
-                        return result;
-                    }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* alignment legacy */
-                                                                                      endPoint,
-                                                                                      L"a") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* alignment numPad style */
-                                                                                      endPoint,
-                                                                                      L"an"))
+                if(beginAlpha > 0xFF) {
+                    beginAlpha = 0xFF;
+                    PR_WARN(tokenBegin, L"fade beginAlpha unacceptable value, auto-correct to 0xFF");
+                } else if(beginAlpha < 0) {
+                    beginAlpha = 0;
+                    PR_WARN(tokenBegin, L"fade beginAlpha unacceptable value, auto-correct to 0");
+                }
+                if(middleAlpha > 0xFF) {
+                    middleAlpha = 0xFF;
+                    PR_WARN(tokenBegin, L"fade middleAlpha unacceptable value, auto-correct to 0xFF");
+                } else if(middleAlpha < 0) {
+                    middleAlpha = 0;
+                    PR_WARN(tokenBegin, L"fade middleAlpha unacceptable value, auto-correct to 0");
+                }
+                if(endAlpha > 0xFF) {
+                    endAlpha = 0xFF;
+                    PR_WARN(tokenBegin, L"fade endAlpha unacceptable value, auto-correct to 0xFF");
+                } else if(endAlpha < 0) {
+                    endAlpha = 0;
+                    PR_WARN(tokenBegin, L"fade endAlpha unacceptable value, auto-correct to 0");
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeFade;
+                result->data.fade.isComplexed = true;
+                result->data.fade.fadeInMS = fadeInMS;
+                result->data.fade.fadeOutMS = fadeOutMS;
+                result->data.fade.beginAlpha = beginAlpha;
+                result->data.fade.middleAlpha = middleAlpha;
+                result->data.fade.endAlpha = endAlpha;
+                result->data.fade.fadeInBeginMS = fadeInBeginMS;
+                result->data.fade.fadeInEndMS = fadeInEndMS;
+                result->data.fade.fadeOutBeginMS = fadeOutBeginMS;
+                result->data.fade.fadeOutEndMS = fadeOutEndMS;
+                return result;
+            } else PR_ERROR(tokenBegin, L"fade match failure, patten \"\\fad(%%d,%%d)\" or \"\\fade(%%d,%%d,%%d,%%d)\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* animation */
+                                                                                  tokenEnd,
+                                                                                  L"t"))
+        {
+            int beginOffsetMS, endOffsetMS;
+            int acceleration; int scanAmount = 0;
+            if((temp = swscanf(tokenBegin, L"\\t(%d,%d,%d,\\%n", &beginOffsetMS, &endOffsetMS, &acceleration, &scanAmount)) == 3)
             {
-                unsigned int position;
-                if((temp = swscanf(contentString, L"\\a%u", &position)) == 1)
-                    result->data.alignment.legacy = true;
-                else if((temp = swscanf(contentString, L"\\an%u", &position)) == 1)
-                    result->data.alignment.legacy = false;
-                if(temp == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeAlignment;
-                    result->data.alignment.position = position;
-                    return result;
-                }
+                result->data.animation.hasAcceleration = true;
+                result->data.animation.hasTimeOffset = true;
+                result->data.animation.acceleration = acceleration;
+                result->data.animation.beginOffsetMS = beginOffsetMS;
+                result->data.animation.endOffsetMS = endOffsetMS;
             }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* karaoke duration without sweep */
-                                                                                      endPoint,
-                                                                                      L"k") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* karaoke duration with sweep */
-                                                                                      endPoint,
-                                                                                      L"K") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* karaoke duration with sweep */
-                                                                                      endPoint,
-                                                                                      L"kf") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* karaoke duration remove b/s */
-                                                                                      endPoint,
-                                                                                      L"ko"))
+            else if((temp = swscanf(tokenBegin, L"\\t(%d,%d,\\%n", &beginOffsetMS, &endOffsetMS, &scanAmount)) == 2)
             {
-                unsigned int sentiSeconds;
-                if((temp = swscanf(contentString, L"\\k%u", &sentiSeconds)) == 1)
-                {
-                    result->data.karaokeDuration.hasSweepEffect = false;
-                    result->data.karaokeDuration.removeBorderOutlineBeforeHighlight = false;
-                }
-                else if((temp = swscanf(contentString, L"\\K%u", &sentiSeconds)) == 1)
-                {
-                    result->data.karaokeDuration.hasSweepEffect = true;
-                    result->data.karaokeDuration.removeBorderOutlineBeforeHighlight = false;
-                }
-                else if((temp = swscanf(contentString, L"\\kf%u", &sentiSeconds)) == 1)
-                {
-                    result->data.karaokeDuration.hasSweepEffect = true;
-                    result->data.karaokeDuration.removeBorderOutlineBeforeHighlight = false;
-                }
-                else if((temp = swscanf(contentString, L"\\ko%u", &sentiSeconds)) == 1)
-                {
-                    result->data.karaokeDuration.hasSweepEffect = false;
-                    result->data.karaokeDuration.removeBorderOutlineBeforeHighlight = true;
-                }
-                if(temp == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeKaraokeDuration;
-                    result->data.karaokeDuration.sentiSeconds = sentiSeconds;
-                    return result;
+                result->data.animation.hasAcceleration = false;
+                result->data.animation.hasTimeOffset = true;
+                result->data.animation.beginOffsetMS = beginOffsetMS;
+                result->data.animation.endOffsetMS = endOffsetMS;
+            }
+            else if((temp = swscanf(tokenBegin, L"\\t(%d,\\%n", &acceleration, &scanAmount)) == 1)
+            {
+                result->data.animation.hasAcceleration = true;
+                result->data.animation.hasTimeOffset = false;
+                result->data.animation.acceleration = acceleration;
+            }
+            else temp = 0;      // explicit assign failure value
+            
+            if(temp >= 1 && scanAmount > 0)
+            {
+                const wchar_t *dataBeginPoint = tokenBegin + 1;     // safe, previous scaned
+                DEBUG_ASSERT(dataBeginPoint[0] == L't');
+                
+                while(dataBeginPoint[0] != L'\0' &&
+                      dataBeginPoint[0] != L'\0' &&
+                      dataBeginPoint[0] != L'\\' &&
+                      (tokenEnd == NULL ? true : dataBeginPoint < tokenEnd))
+                    dataBeginPoint++;
+                
+                DEBUG_ASSERT(dataBeginPoint[0] == L'\\');           // impossible
+                if(dataBeginPoint[0] != L'\\') goto LABEL_failure;
+                
+                const wchar_t *leftBrace = tokenBegin + 2;          // safe, previous scaned
+                DEBUG_ASSERT(leftBrace[0] == L'(');
+                
+                const wchar_t *matchBrace = CF_match_next_braces(leftBrace, tokenEnd, true);
+                if(matchBrace == NULL || matchBrace <= dataBeginPoint) {
+                    PR_ERROR(dataBeginPoint, L"animation parsing modifiers failed");
+                    goto LABEL_failure;
                 }
                 
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* Wrap style */
-                                                                                      endPoint,
-                                                                                      L"q"))
-            {
-                unsigned int style;
-                if((temp = swscanf(contentString, L"\\q%u", &style)) == 1)
-                    if(style <= 3)
-                    {
-                        result->type = CFASSFileDialogueTextContentOverrideContentTypeWrapingStyle;
-                        result->data.wrapStyle.style = style;
-                        return result;
-                    }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* position */
-                                                                                      endPoint,
-                                                                                      L"pos"))
-            {
-                int x, y;
-                if((temp = swscanf(contentString, L"\\pos(%d,%d)", &x, &y)) == 2)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypePosition;
-                    result->data.position.x = x;
-                    result->data.position.y = y;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* movement */
-                                                                                      endPoint,
-                                                                                      L"move"))
-            {
-                int fromX, fromY, toX, toY;
-                unsigned int startFromMS, endFromMS;
-                if((temp = swscanf(contentString, L"\\move(%d,%d,%d,%d,%u,%u)", &fromX, &fromY, &toX, &toY, &startFromMS, &endFromMS)) == 6)
-                {
-                    result->data.movement.hasTimeControl = true;
-                    result->data.movement.startFromMS = startFromMS;
-                    result->data.movement.endFromMS = endFromMS;
-                }
-                else if((temp = swscanf(contentString, L"\\move(%d,%d,%d,%d)", &fromX, &fromY, &toX, &toY)) == 4)
-                {
-                    result->data.movement.hasTimeControl = false;
-                    result->data.movement.startFromMS = 0;
-                    result->data.movement.endFromMS = 0;
-                }
-                if(temp >= 4)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeMove;
-                    result->data.movement.fromX = fromX;
-                    result->data.movement.fromY = fromY;
-                    result->data.movement.toX = toX;
-                    result->data.movement.toY = toY;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* rotation origin */
-                                                                                      endPoint,
-                                                                                      L"org"))
-            {
-                int x, y;
-                if((temp = swscanf(contentString, L"\\org(%d,%d)", &x, &y)) == 2)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeRotationOrigin;
-                    result->data.rotationOrigin.x = x;
-                    result->data.rotationOrigin.y = y;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* fade */
-                                                                                      endPoint,
-                                                                                      L"fad") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* fade complex */
-                                                                                      endPoint,
-                                                                                      L"fade"))
-            {
-                unsigned int fadeInMS, fadeOutMS,
-                             beginAlpha, middleAlpha, endAlpha,
-                             fadeInBeginMS, fadeInEndMS, fadeOutBeginMS, fadeOutEndMS;
+                const wchar_t *dataEndPoint = matchBrace - 1;      // should valid, may equal to dataBeginPoint
                 
-                if((temp = swscanf(contentString, L"\\fad(%u,%u)", &fadeInMS, &fadeOutMS)) == 2)
+                if((result->data.animation.modifiers = malloc(sizeof(wchar_t) * (dataEndPoint - dataBeginPoint + 1 + 1))) != NULL)
                 {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeFade;
-                    result->data.fade.isComplexed = false;
-                    result->data.fade.fadeInMS = fadeInMS;
-                    result->data.fade.fadeOutMS = fadeOutMS;
-                    result->data.fade.beginAlpha = 0;
-                    result->data.fade.middleAlpha = 0;
-                    result->data.fade.endAlpha = 0;
-                    result->data.fade.fadeInBeginMS = 0;
-                    result->data.fade.fadeInEndMS = 0;
-                    result->data.fade.fadeOutBeginMS = 0;
-                    result->data.fade.fadeOutEndMS = 0;
-                    return result;
+                    result->type = CFASSFileDialogueTextContentOverrideContentTypeAnimation;
+                    wmemcpy(result->data.animation.modifiers, dataBeginPoint, dataEndPoint - dataBeginPoint + 1);
+                    result->data.animation.modifiers[dataEndPoint-dataBeginPoint+1] = L'\0';
+                    if(CFASSFileDialogueTextContentOverrideContentCheckAnimationModifiers(result->data.animation.modifiers))
+                        return result;
+                    else PR_ERROR(dataBeginPoint, L"animation check failure");
+                    free(result->data.animation.modifiers);
+                } else PR_INFO(NULL, L"CFASSFileDialogueTextContentOverrideContent animation modifiers allocation failed");
+            } else PR_ERROR(tokenBegin, L"animation match failure, patten \"\\t(%%d[,%%d[,%%d]],\(animateContent))\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* clip */
+                                                                                  tokenEnd,
+                                                                                  L"clip") ||
+                CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* clip reversed */
+                                                                                  tokenEnd,
+                                                                                  L"iclip"))
+        {
+            int upLeftX, upLeftY;
+            int lowRightX, lowRightY;
+            int scale;
+            int scanAmount = 0;
+            const wchar_t *braceBegin = NULL;
+            bool checkMark = false;
+            if((temp = swscanf(tokenBegin, L"\\clip(%d,%d,%d,%d)%n", &upLeftX, &upLeftY, &lowRightX, &lowRightY, &scanAmount)) == 4 && scanAmount > 0)
+            {
+                result->data.clip.reverse = false;
+                result->data.clip.usingDrawingCommand = false;
+                result->data.clip.hasScale = false;
+                result->data.clip.upLeftX = upLeftX;
+                result->data.clip.upLeftY = upLeftY;
+                result->data.clip.lowRightX = lowRightX;
+                result->data.clip.lowRightY = lowRightY;
+                checkMark = true;
+            }
+            else if((temp = swscanf(tokenBegin, L"\\iclip(%d,%d,%d,%d)%n", &upLeftX, &upLeftY, &lowRightX, &lowRightY, &scanAmount)) == 4 && scanAmount > 0)
+            {
+                result->data.clip.reverse = true;
+                result->data.clip.usingDrawingCommand = false;
+                result->data.clip.hasScale = false;
+                result->data.clip.upLeftX = upLeftX;
+                result->data.clip.upLeftY = upLeftY;
+                result->data.clip.lowRightX = lowRightX;
+                result->data.clip.lowRightY = lowRightY;
+                checkMark = true;
+            }
+            else if((temp = swscanf(tokenBegin, L"\\clip(%d,%*l[^)])%n", &scale, &scanAmount)) == 1 && scanAmount > 0)
+            {
+                braceBegin = tokenBegin;
+                while (braceBegin[0] != L'(') braceBegin++;                     // note: may excede tokenEnd
+                result->data.clip.reverse = false;
+                result->data.clip.usingDrawingCommand = true;
+                result->data.clip.hasScale = true;
+                result->data.clip.scale = scale;
+                checkMark = true;
+            }
+            else if((temp = swscanf(tokenBegin, L"\\iclip(%d,%*l[^)])%n", &scale)) == 1 && scanAmount > 0)
+            {
+                braceBegin = tokenBegin;
+                while (braceBegin[0] != L'(') braceBegin++;                     // note: may excede tokenEnd
+                result->data.clip.reverse = true;
+                result->data.clip.usingDrawingCommand = true;
+                result->data.clip.hasScale = true;
+                result->data.clip.scale = scale;
+                checkMark = true;
+            }
+            else if(CF_wchar_string_match_beginning(tokenBegin, L"\\clip("))
+            {
+                braceBegin = tokenBegin + wcslen(L"\\clip(") - 1;               // note: may excede tokenEnd
+                result->data.clip.reverse = false;
+                result->data.clip.usingDrawingCommand = true;
+                result->data.clip.hasScale = false;
+                checkMark = true;
+            }
+            else if(CF_wchar_string_match_beginning(tokenBegin, L"\\iclip("))
+            {
+                braceBegin = tokenBegin + wcslen(L"\\iclip(") - 1;              // note: may excede tokenEnd
+                result->data.clip.reverse = true;
+                result->data.clip.usingDrawingCommand = true;
+                result->data.clip.hasScale = false;
+                checkMark = true;
+            }
+            if(checkMark)       // manage clip.drawingCommand
+            {
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeClip;
+                if(result->data.clip.usingDrawingCommand)
+                {
+                    DEBUG_ASSERT(braceBegin[0] == L'(');
+                    const wchar_t *braceEnd = CF_match_next_braces(braceBegin, tokenEnd, true);
+                    if(braceEnd == NULL || braceEnd > tokenEnd) {
+                        PR_ERROR(braceBegin, L"animate brace match failure");
+                        goto LABEL_failure;
+                    }
+                    const wchar_t *drawingBegin = braceBegin + 1;
                     
-                }
-                else if((temp = swscanf(contentString, L"\\fade(%u,%u,%u,%u,%u,%u,%u)",
-                                        &beginAlpha, &middleAlpha, &endAlpha,
-                                        &fadeInBeginMS, &fadeInEndMS,
-                                        &fadeOutBeginMS, &fadeOutEndMS)) == 7)
-                    if(beginAlpha<=0xFF && middleAlpha<=0xFF && endAlpha<=0xFF)
+                    if(result->data.clip.hasScale)
                     {
-                        result->type = CFASSFileDialogueTextContentOverrideContentTypeFade;
-                        result->data.fade.isComplexed = true;
-                        result->data.fade.fadeInMS = fadeInMS;
-                        result->data.fade.fadeOutMS = fadeOutMS;
-                        result->data.fade.beginAlpha = beginAlpha;
-                        result->data.fade.middleAlpha = middleAlpha;
-                        result->data.fade.endAlpha = endAlpha;
-                        result->data.fade.fadeInBeginMS = fadeInBeginMS;
-                        result->data.fade.fadeInEndMS = fadeInEndMS;
-                        result->data.fade.fadeOutBeginMS = fadeOutBeginMS;
-                        result->data.fade.fadeOutEndMS = fadeOutEndMS;
-                        return result;
+                        while(drawingBegin[0] != L',')
+                            if(drawingBegin[0] == L'\0' || drawingBegin[0] == L'\n' || drawingBegin + 1 >= braceEnd) { DEBUG_POINT; goto LABEL_failure; }
+                            else drawingBegin++;
+                        
+                        DEBUG_ASSERT(drawingBegin[0] == L',');
+                        drawingBegin++;     // advanced to the drawing begin
                     }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* animation */
-                                                                                      endPoint,
-                                                                                      L"t"))
-            {
-                unsigned int beginOffsetMS, endOffsetMS;
-                unsigned int acceleration;
-                if((temp = swscanf(contentString, L"\\t(%u,%u,%u,\\", &beginOffsetMS, &endOffsetMS, &acceleration)) == 3)
-                {
-                    result->data.animation.hasAcceleration = true;
-                    result->data.animation.hasTimeOffset = true;
-                    result->data.animation.acceleration = acceleration;
-                    result->data.animation.beginOffsetMS = beginOffsetMS;
-                    result->data.animation.endOffsetMS = endOffsetMS;
-                }
-                else if((temp = swscanf(contentString, L"\\t(%u,%u,\\", &beginOffsetMS, &endOffsetMS)) == 2)
-                {
-                    result->data.animation.hasAcceleration = false;
-                    result->data.animation.hasTimeOffset = true;
-                    result->data.animation.beginOffsetMS = beginOffsetMS;
-                    result->data.animation.endOffsetMS = endOffsetMS;
-                }
-                else if((temp = swscanf(contentString, L"\\t(%u,\\", &acceleration)) == 1)
-                {
-                    result->data.animation.hasAcceleration = true;
-                    result->data.animation.hasTimeOffset = false;
-                    result->data.animation.acceleration = acceleration;
-                }
-                if(temp >= 1)
-                {
-                    const wchar_t *dataBeginPoint = contentString + 1;
-                    while(*dataBeginPoint != L'\\' && dataBeginPoint<endPoint) dataBeginPoint++;
-                    bool checkPoint = true;
-                    if(*dataBeginPoint == L'\\')
+                    
+                    const wchar_t *drawingEnd = braceEnd - 1;
+                    
+                    if(drawingEnd < drawingBegin) {     // drawingBegin == drawingEnd is acceptable
+                        PR_ERROR(drawingBegin, L"clip could not find drawing command");
+                        goto LABEL_failure;
+                    }
+                    
+                    if((result->data.clip.drawingCommand = malloc(sizeof(wchar_t) * (drawingEnd - drawingBegin + 1 + 1))) != NULL)
                     {
-                        const wchar_t *dataEndPoint = dataBeginPoint;
-                        while(*dataEndPoint!=L')' && dataEndPoint<endPoint && checkPoint)
+                        wmemcpy(result->data.clip.drawingCommand, drawingBegin, drawingEnd - drawingBegin + 1);
+                        result->data.clip.drawingCommand[drawingEnd - drawingBegin + 1] = L'\0';
+                        CFASSFileDialogueTextDrawingContextRef drawingContext;
+                        if((drawingContext = CFASSFileDialogueTextDrawingContextCreateFromString(result->data.clip.drawingCommand)) != NULL)
                         {
-                            if(*dataEndPoint == L'(')
-                            {
-                                while(*dataEndPoint != L')' && dataEndPoint<endPoint) dataEndPoint++;
-                                if(*dataEndPoint != L')') checkPoint = false;
-                            }
-                            dataEndPoint++;
-                        }
-                        if(checkPoint && *dataEndPoint == L')')
-                        {
-                            dataEndPoint--;
-                            if((result->data.animation.modifiers = malloc(sizeof(wchar_t)*(dataEndPoint-dataBeginPoint+1+1))) != NULL)
-                            {
-                                result->type = CFASSFileDialogueTextContentOverrideContentTypeAnimation;
-                                wmemcpy(result->data.animation.modifiers, dataBeginPoint, dataEndPoint-dataBeginPoint+1);
-                                result->data.animation.modifiers[dataEndPoint-dataBeginPoint+1] = L'\0';
-                                if(CFASSFileDialogueTextContentOverrideContentCheckAnimationModifiers(result->data.animation.modifiers))
-                                    return result;
-                                free(result->data.animation.modifiers);
-                            }
-                        }
-                    }
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* clip */
-                                                                                      endPoint,
-                                                                                      L"clip") ||
-                    CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* clip reversed */
-                                                                                      endPoint,
-                                                                                      L"iclip"))
-            {
-                int upLeftX, upLeftY;
-                int lowRightX, lowRightY;
-                unsigned int scale;
-                const wchar_t *dataBeginPoint = NULL, *dataEndPoint;
-                bool checkMark = false;
-                if((temp = swscanf(contentString, L"\\clip(%d,%d,%d,%d)", &upLeftX, &upLeftY, &lowRightX, &lowRightY)) == 4)
-                {
-                    result->data.clip.reverse = false;
-                    result->data.clip.usingDrawingCommand = false;
-                    result->data.clip.hasScale = false;
-                    result->data.clip.upLeftX = upLeftX;
-                    result->data.clip.upLeftY = upLeftY;
-                    result->data.clip.lowRightX = lowRightX;
-                    result->data.clip.lowRightY = lowRightY;
-                    checkMark = true;
-                }
-                else if((temp = swscanf(contentString, L"\\iclip(%d,%d,%d,%d)", &upLeftX, &upLeftY, &lowRightX, &lowRightY)) == 4)
-                {
-                    result->data.clip.reverse = true;
-                    result->data.clip.usingDrawingCommand = false;
-                    result->data.clip.hasScale = false;
-                    result->data.clip.upLeftX = upLeftX;
-                    result->data.clip.upLeftY = upLeftY;
-                    result->data.clip.lowRightX = lowRightX;
-                    result->data.clip.lowRightY = lowRightY;
-                    checkMark = true;
-                }
-                else if((temp = swscanf(contentString, L"\\clip(%u,%*l[^)])", &scale)) == 1)
-                {
-                    dataBeginPoint = contentString;
-                    while (*dataBeginPoint!=L'(') dataBeginPoint++;
-                    dataBeginPoint++;
-                    result->data.clip.reverse = false;
-                    result->data.clip.usingDrawingCommand = true;
-                    result->data.clip.hasScale = true;
-                    result->data.clip.scale = scale;
-                    checkMark = true;
-                }
-                else if((temp = swscanf(contentString, L"\\iclip(%u,%*l[^)])", &scale)) == 1)
-                {
-                    dataBeginPoint = contentString;
-                    while (*dataBeginPoint!=L'(') dataBeginPoint++;
-                    dataBeginPoint++;
-                    result->data.clip.reverse = true;
-                    result->data.clip.usingDrawingCommand = true;
-                    result->data.clip.hasScale = true;
-                    result->data.clip.scale = scale;
-                    checkMark = true;
-                }
-                else if(CF_wchar_string_match_beginning(contentString, L"\\clip("))
-                {
-                    dataBeginPoint = contentString + wcslen(L"\\clip(");
-                    result->data.clip.reverse = false;
-                    result->data.clip.usingDrawingCommand = true;
-                    result->data.clip.hasScale = false;
-                    checkMark = true;
-                }
-                else if(CF_wchar_string_match_beginning(contentString, L"\\iclip("))
-                {
-                    dataBeginPoint = contentString + wcslen(L"\\iclip(");
-                    result->data.clip.reverse = true;
-                    result->data.clip.usingDrawingCommand = true;
-                    result->data.clip.hasScale = false;
-                    checkMark = true;
-                }
-                if(checkMark)       // manage clip.drawingCommand
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeClip;
-                    if(result->data.clip.usingDrawingCommand)
-                    {
-                        if(result->data.clip.hasScale)
-                        {
-                            while (*dataBeginPoint!=L',')
-                                dataBeginPoint++;
-                            if(dataBeginPoint<endPoint) dataBeginPoint++;
-                        }
-                        dataEndPoint = dataBeginPoint;
-                        while(*dataEndPoint!=L')' && dataEndPoint<endPoint) dataEndPoint++;
-                        if(*dataEndPoint == L')')
-                        {
-                            dataEndPoint--;
-                            if(dataEndPoint>=dataBeginPoint)
-                                if((result->data.clip.drawingCommand = malloc(sizeof(wchar_t)*(dataEndPoint-dataBeginPoint+1+1)))!=NULL)
-                                {
-                                    wmemcpy(result->data.clip.drawingCommand, dataBeginPoint, dataEndPoint-dataBeginPoint+1);
-                                    result->data.clip.drawingCommand[dataEndPoint-dataBeginPoint+1] = L'\0';
-                                    CFASSFileDialogueTextDrawingContextRef drawingContext;
-                                    if((drawingContext = CFASSFileDialogueTextDrawingContextCreateFromString(result->data.clip.drawingCommand)) != NULL)
-                                    {
-                                        CFASSFileDialogueTextDrawingContextDestory(drawingContext);
-                                        return result;
-                                    }
-                                    free(result->data.clip.drawingCommand);
-                                }
-                        }
-                    }
-                    else
-                    {
-                        result->data.clip.drawingCommand = NULL;
-                        return result;
-                    }
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* drawing mode */
-                                                                                      endPoint,
-                                                                                      L"p"))
-            {
-                unsigned int mode;
-                if((temp = swscanf(contentString, L"\\p%u", &mode)) == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeDrawing;
-                    result->data.drawing.mode = mode;
-                    return result;
-                }
-            }
-            else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(contentString,     /* baseline offset */
-                                                                                      endPoint,
-                                                                                      L"pbo"))
-            {
-                int towardsBottomPixels;
-                if((temp = swscanf(contentString, L"\\pbo%d", &towardsBottomPixels)) == 1)
-                {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeBaselineOffset;
-                    result->data.baselineOffset.towardsBottomPixels = towardsBottomPixels;
-                    return result;
-                }
-            }
-            else if(CF_wchar_string_match_beginning(contentString, L"\\fn"))                             /* font name */
-            {
-                const wchar_t *dataBeginPoint = contentString + wcslen(L"\\fn"), *dataEndPoint;
-                if(dataBeginPoint <= endPoint && *dataBeginPoint!=L'\\')
-                {
-                    dataEndPoint = dataBeginPoint;
-                    while(dataEndPoint<endPoint) dataEndPoint++;
-                    if((result->data.fontName.name = malloc(sizeof(wchar_t)*(dataEndPoint-dataBeginPoint+1+1))) != NULL)
-                    {
-                        result->type = CFASSFileDialogueTextContentOverrideContentTypeFontName;
-                        wmemcpy(result->data.fontName.name, dataBeginPoint, dataEndPoint-dataBeginPoint+1);
-                        result->data.fontName.name[dataEndPoint-dataBeginPoint+1] = L'\0';
-                        return result;
-                    }
-                }
-            }
-            else if(CF_wchar_string_match_beginning(contentString, L"\\r"))                              /* reset */
-            {
-                const wchar_t *dataBeginPoint = contentString + wcslen(L"\\r"), *dataEndPoint;
-                if(dataBeginPoint <= endPoint)
-                {
-                    dataEndPoint = dataBeginPoint;
-                    while(dataEndPoint<endPoint) dataEndPoint++;
-                    if((result->data.reset.styleName = malloc(sizeof(wchar_t)*(dataEndPoint-dataBeginPoint+1+1))) != NULL)
-                    {
-                        result->type = CFASSFileDialogueTextContentOverrideContentTypeReset;
-                        result->data.reset.resetToDefault = false;
-                        wmemcpy(result->data.reset.styleName, dataBeginPoint, dataEndPoint-dataBeginPoint+1);
-                        result->data.reset.styleName[dataEndPoint-dataBeginPoint+1] = L'\0';
-                        return result;
-                    }
+                            CFASSFileDialogueTextDrawingContextDestory(drawingContext);
+                            return result;
+                        } PR_ERROR(drawingBegin, L"clip not valid drawing command");
+                        free(result->data.clip.drawingCommand);
+                    } PR_INFO(NULL, L"CFASSFileDialogueTextContentOverrideContent drawingCommand allocation failed");
                 }
                 else
                 {
-                    result->type = CFASSFileDialogueTextContentOverrideContentTypeReset;
-                    result->data.reset.resetToDefault = true;
-                    result->data.reset.styleName = NULL;
+                    result->data.clip.drawingCommand = NULL;
                     return result;
                 }
-            }
-            free(result);
+            } else PR_ERROR(tokenBegin, L"animation match failure, patten \"\\[i]clip([%%d,]<drawing commands>)\" or \"\\[i]clip(%%d,%%d,%%d,%%d)\"");
         }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* drawing mode */
+                                                                                  tokenEnd,
+                                                                                  L"p"))
+        {
+            int mode;
+            if((temp = swscanf(tokenBegin, L"\\p%d", &mode)) == 1)
+            {
+                if(mode < 0) {
+                    if(controlLevel & CFASSFileControlLevelIgnore) {
+                        mode = 0;
+                        PR_WARN(tokenBegin, L"drawingMode unacceptable value, auto-correct to 0(disable)");
+                    }
+                    else {
+                        PR_ERROR(tokenBegin, L"drawingMode unacceptable value");
+                        goto LABEL_failure;
+                    }
+                }
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeDrawing;
+                result->data.drawing.mode = mode;
+                return result;
+            } else PR_ERROR(tokenBegin, L"drawingMode match failure, patten \"\\p%%d\"");
+        }
+        else if(CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(tokenBegin,     /* baseline offset */
+                                                                                  tokenEnd,
+                                                                                  L"pbo"))
+        {
+            int towardsBottomPixels;
+            if((temp = swscanf(tokenBegin, L"\\pbo%d", &towardsBottomPixels)) == 1)
+            {
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeBaselineOffset;
+                result->data.baselineOffset.towardsBottomPixels = towardsBottomPixels;
+                return result;
+            } else PR_ERROR(tokenBegin, L"baselineOffset match failure, patten \"\\pbo%%d\"");
+        }
+        else if(CF_wchar_string_match_beginning(tokenBegin, L"\\fn"))                             /* font name */
+        {
+            const wchar_t *dataBeginPoint = tokenBegin + wcslen(L"\\fn"), *dataEndPoint;
+            if((tokenEnd == NULL ? true : dataBeginPoint <= tokenEnd) &&
+               dataBeginPoint[0] != L'\\' &&
+               dataBeginPoint[0] != L'}' &&
+               dataBeginPoint[0] != L'\0' &&
+               dataBeginPoint[0] != L'\n')
+            {
+                dataEndPoint = dataBeginPoint;
+                while((tokenEnd == NULL ? true : dataEndPoint + 1 <= tokenEnd) &&
+                      dataEndPoint[1] != L'\\' &&
+                      dataEndPoint[1] != L'}' &&
+                      dataEndPoint[1] != L'\0' &&
+                      dataEndPoint[1] != L'\n')
+                    dataEndPoint++;
+                DEBUG_ASSERT(tokenEnd == NULL ? true : dataEndPoint == tokenEnd);
+                if((result->data.fontName.name = malloc(sizeof(wchar_t) * (dataEndPoint - dataBeginPoint + 1 + 1))) != NULL)
+                {
+                    result->type = CFASSFileDialogueTextContentOverrideContentTypeFontName;
+                    wmemcpy(result->data.fontName.name, dataBeginPoint, dataEndPoint - dataBeginPoint + 1);
+                    result->data.fontName.name[dataEndPoint - dataBeginPoint + 1] = L'\0';
+                    return result;
+                } else PR_INFO(NULL, L"CFASSFileDialogueTextContentOverrideContent fontName allocation failed");
+            } else PR_ERROR(tokenBegin, L"fontName interprate failed");
+        }
+        else if(CF_wchar_string_match_beginning(tokenBegin, L"\\r"))                              /* reset */
+        {
+            const wchar_t *dataBeginPoint = tokenBegin + wcslen(L"\\r"), *dataEndPoint;
+            if((tokenEnd == NULL ? true : dataBeginPoint <= tokenEnd) &&
+               dataBeginPoint[0] != L'\\' &&
+               dataBeginPoint[0] != L'}' &&
+               dataBeginPoint[0] != L'\0' &&
+               dataBeginPoint[0] != L'\n')
+            {
+                dataEndPoint = dataBeginPoint;
+                while((tokenEnd == NULL ? true : dataEndPoint + 1 <= tokenEnd) &&
+                      dataEndPoint[1] != L'\\' &&
+                      dataEndPoint[1] != L'}' &&
+                      dataEndPoint[1] != L'\0' &&
+                      dataEndPoint[1] != L'\n')
+                    dataEndPoint++;
+                DEBUG_ASSERT(tokenEnd == NULL ? true : dataEndPoint == tokenEnd);
+                if((result->data.reset.styleName = malloc(sizeof(wchar_t)*(dataEndPoint - dataBeginPoint + 1 + 1))) != NULL)
+                {
+                    result->type = CFASSFileDialogueTextContentOverrideContentTypeReset;
+                    result->data.reset.resetToDefault = false;
+                    wmemcpy(result->data.reset.styleName, dataBeginPoint, dataEndPoint - dataBeginPoint + 1);
+                    result->data.reset.styleName[dataEndPoint - dataBeginPoint + 1] = L'\0';
+                    return result;
+                } else PR_INFO(NULL, L"CFASSFileDialogueTextContentOverrideContent style reset allocation failed");
+            }
+            else
+            {
+                result->type = CFASSFileDialogueTextContentOverrideContentTypeReset;
+                result->data.reset.resetToDefault = true;
+                result->data.reset.styleName = NULL;
+                return result;
+            }
+        }
+        else PR_ERROR(tokenBegin, L"unkown override type");
+        LABEL_failure: free(result);
     }
     return NULL;
 }
 
-static bool CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(const wchar_t *contentString,
-                                                                              const wchar_t *endPoint,
-                                                                              const wchar_t *matchAlpha)
+static bool CFASSFileDialogueTextContentOverrideContentCompareStringAndPrefix(const wchar_t * _Nonnull tokenBegin,
+                                                                              const wchar_t * _Nonnull tokenEnd,
+                                                                              const wchar_t * _Nonnull matchTypeString)
 {
-    if(*contentString != L'\\') return false;
-    contentString++;
-    const wchar_t *searchEnd = contentString - 1;
-    while(iswalpha(searchEnd[1])) searchEnd++;
-    if(searchEnd<contentString) return false;
-    while (contentString <= searchEnd)
-        if(*matchAlpha++ != *contentString++) return false;
-    if(*matchAlpha != L'\0') return false;
-    return true;
+    DEBUG_ASSERT(tokenBegin != NULL && tokenEnd != NULL && tokenBegin <= tokenEnd && matchTypeString != NULL);
+    if(tokenBegin == NULL || tokenEnd == NULL || tokenBegin > tokenEnd || matchTypeString == NULL) return false;
+    if(tokenBegin[0] != L'\\') return false;
+    
+    const wchar_t *matchBegin = tokenBegin + 1;
+    size_t matchLength = 0u;
+    
+    while(matchBegin[matchLength] != L'\0' && matchBegin + matchLength <= tokenEnd && iswalpha(matchBegin[matchLength])) matchLength++;
+    size_t matchTypeStringLength = wcslen(matchTypeString);
+    
+    if(matchTypeStringLength == matchLength && wmemcmp(matchBegin, matchTypeString, matchTypeStringLength) == 0) return true;
+    return false;
 }
 
 int CFASSFileDialogueTextContentOverrideContentStoreStringResult(CFASSFileDialogueTextContentOverrideContentRef overrideContent, wchar_t *targetPoint)
@@ -1865,36 +2144,46 @@ void CFASSFileDialogueTextContentOverrideContentMakeChange(CFASSFileDialogueText
 
 static bool CFASSFileDialogueTextContentOverrideContentCheckAnimationModifiers(wchar_t *modifiers)
 {
-    if(modifiers == NULL)
-        CFExceptionRaise(CFExceptionNameInvalidArgument, NULL, "CFASSFileDialogueTextContentOverrideContentCheckAnimationModifiers NULL");
-    if(*modifiers!=L'\\')   // include modifier[0] == L'\0'
-        return false;
+    DEBUG_ASSERT(modifiers != NULL); if(modifiers == NULL) return false;
+    
+    // include modifier[0] == L'\0'
+    if(modifiers[0] != L'\\') return false;
+    
+    // create fake parsingResult
+    CFASSFileParsingResultRef parsingResult = CFASSFileParsingResultCreate();
+    if(parsingResult != NULL) { DEBUG_POINT return false; }
+    
+    bool formatCheck = true;
     wchar_t *nextBeginPoint;
     CFASSFileDialogueTextContentOverrideContentRef modifierContent;
-    while ((nextBeginPoint = wcschr(modifiers+1, L'\\'))!=NULL)
+    while ((nextBeginPoint = wcschr(modifiers + 1, L'\\')) != NULL)
     {
-        modifierContent = CFASSFileDialogueTextContentOverrideContentCreateWithString(modifiers, nextBeginPoint-1);
-        if(modifierContent == NULL)
-            return false;
+        modifierContent = CFASSFileDialogueTextContentOverrideContentCreateWithString(modifiers, nextBeginPoint - 1, parsingResult);
+        if(modifierContent == NULL) {
+            formatCheck = false; break;
+        }
         if(!CFASSFileDialogueTextContentOverrideContentCheckAnimationModifierSupport(modifierContent))
         {
             CFASSFileDialogueTextContentOverrideContentDestory(modifierContent);
-            return false;
+            formatCheck = false; break;
         }
         CFASSFileDialogueTextContentOverrideContentDestory(modifierContent);
         modifiers = nextBeginPoint;
     }
-    wchar_t *endPoint = modifiers+wcslen(modifiers)-1;
-    modifierContent = CFASSFileDialogueTextContentOverrideContentCreateWithString(modifiers, endPoint);
-    if(modifierContent == NULL)
-        return false;
-    if(!CFASSFileDialogueTextContentOverrideContentCheckAnimationModifierSupport(modifierContent))
-    {
+    if(formatCheck) {
+        wchar_t *endPoint = modifiers + wcslen(modifiers)-1;
+        modifierContent = CFASSFileDialogueTextContentOverrideContentCreateWithString(modifiers, endPoint, parsingResult);
+        
+        if(modifierContent == NULL) formatCheck = false;
+        else if(!CFASSFileDialogueTextContentOverrideContentCheckAnimationModifierSupport(modifierContent))
+            formatCheck = false;
         CFASSFileDialogueTextContentOverrideContentDestory(modifierContent);
-        return false;
     }
-    CFASSFileDialogueTextContentOverrideContentDestory(modifierContent);
-    return true;
+    
+    CFASSFileParsingResultDestory(parsingResult);
+    
+    if(formatCheck) return true;
+    return false;
 }
 
 static bool CFASSFileDialogueTextContentOverrideContentCheckAnimationModifierSupport(CFASSFileDialogueTextContentOverrideContentRef content)

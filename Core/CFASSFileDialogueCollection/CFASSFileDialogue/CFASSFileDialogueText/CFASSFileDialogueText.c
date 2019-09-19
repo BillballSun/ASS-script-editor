@@ -10,7 +10,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <wchar.h>
-
+#include <stdbool.h>
 #include "CFASSFileDialogueText.h"
 #include "CFASSFileDialogueText_Private.h"
 #include "CFASSFileDialogueTextContent.h"
@@ -20,11 +20,20 @@
 #include "CFEnumerator.h"
 #include "CFASSFileChange.h"
 #include "CFASSFileChange_Private.h"
+#include "CFASSFileParsingResult.h"
+#include "CFASSFileParsingResult_Macro.h"
+#include "CFASSFileControl.h"
+#include "CFMacro.h"
 
 struct CFASSFileDialogueText
 {
     CFPointerArrayRef contentArray;     // Can't be empty, must at least have CFASSFileDialogueTextContentCreateEmptyString();
 };
+
+static CFPointerArrayRef _Nullable CFASSFileDialogueTextCreateArrayForSeperateRawString(const wchar_t * _Nonnull string);
+
+CLANG_DIAGNOSTIC_PUSH
+CLANG_DIAGNOSTIC_IGNORE_NONNULL
 
 void CFASSFileDialogueTextMakeChange(CFASSFileDialogueTextRef dialogueText, CFASSFileChangeRef change)
 {
@@ -36,12 +45,12 @@ void CFASSFileDialogueTextMakeChange(CFASSFileDialogueTextRef dialogueText, CFAS
     if(change->type & CFASSFileChangeTypeDiscardAllOverride)
     {
 		bool checkPoint;
-		size_t index, length;
+		size_t index, arrayCount;
 		do
 		{
 			checkPoint = false;
-			length = CFPointerArrayGetLength(dialogueText->contentArray);
-			for (index = 0; index < length; index++)
+			arrayCount = CFPointerArrayGetCount(dialogueText->contentArray);
+			for (index = 0; index < arrayCount; index++)
 			{
 				eachTextContent = CFPointerArrayGetPointerAtIndex(dialogueText->contentArray, index);
 				if (CFASSFileDialogueTextContentGetType(eachTextContent) == CFASSFileDialogueTextContentTypeOverride)
@@ -56,7 +65,7 @@ void CFASSFileDialogueTextMakeChange(CFASSFileDialogueTextRef dialogueText, CFAS
 				CFASSFileDialogueTextContentDestory(eachTextContent);
 			}
 		} while (checkPoint);
-        if(CFPointerArrayGetLength(dialogueText->contentArray) == 0)
+        if(CFPointerArrayGetCount(dialogueText->contentArray) == 0)
             CFPointerArrayAddPointer(dialogueText->contentArray, CFASSFileDialogueTextContentCreateEmptyString(), false);
     }
     enumerator = CFASSFileDialogueTextCreateEnumerator(dialogueText);
@@ -94,10 +103,10 @@ CFASSFileDialogueTextRef CFASSFileDialogueTextCopy(CFASSFileDialogueTextRef dial
     {
         if((result->contentArray = CFPointerArrayCreateEmpty()) != NULL)
         {
-            size_t arrayLength = CFPointerArrayGetLength(dialogueText->contentArray);
+            size_t arrayCount = CFPointerArrayGetCount(dialogueText->contentArray);
             bool copyCheck = true;
             CFASSFileDialogueTextContentRef eachContent;
-            for (size_t index = 0; index<arrayLength && copyCheck; index++) {
+            for (size_t index = 0; index<arrayCount && copyCheck; index++) {
                 eachContent = CFASSFileDialogueTextContentCopy
                 ((CFASSFileDialogueTextContentRef)CFPointerArrayGetPointerAtIndex(dialogueText->contentArray, index));
                 if(eachContent == NULL)
@@ -107,8 +116,8 @@ CFASSFileDialogueTextRef CFASSFileDialogueTextCopy(CFASSFileDialogueTextRef dial
             }
             if(copyCheck)
                 return result;
-            arrayLength = CFPointerArrayGetLength(result->contentArray);
-            for (size_t index = 0; index<arrayLength; index++)
+            arrayCount = CFPointerArrayGetCount(result->contentArray);
+            for (size_t index = 0; index<arrayCount; index++)
                 CFASSFileDialogueTextContentDestory
                 ((CFASSFileDialogueTextContentRef)CFPointerArrayGetPointerAtIndex(result->contentArray, index));
             CFPointerArrayDestory(result->contentArray);
@@ -118,11 +127,13 @@ CFASSFileDialogueTextRef CFASSFileDialogueTextCopy(CFASSFileDialogueTextRef dial
     return NULL;
 }
 
-int CFASSFileDialogueTextStoreStringResult(CFASSFileDialogueTextRef text, wchar_t * targetPoint)
+int CFASSFileDialogueTextStoreStringResult(CFASSFileDialogueTextRef _Nonnull text, wchar_t * _Nullable targetPoint)
 {
+    DEBUG_ASSERT(text != NULL); if(text == NULL) return 0;
+    
     int result = 0, temp;
-    size_t arrayLength = CFPointerArrayGetLength(text->contentArray);
-    for(size_t index = 0; index<arrayLength; index++)
+    size_t arrayCount = CFPointerArrayGetCount(text->contentArray);
+    for(size_t index = 0; index < arrayCount; index++)
     {
         temp = CFASSFileDialogueTextContentStoreStringResult
         ((CFASSFileDialogueTextContentRef)CFPointerArrayGetPointerAtIndex(text->contentArray, index), targetPoint);
@@ -136,78 +147,155 @@ int CFASSFileDialogueTextStoreStringResult(CFASSFileDialogueTextRef text, wchar_
         targetPoint[0] = L'\n';
         targetPoint[1] = L'\0';
     }
-    return result+1;
+    return result + 1;
 }
 
-CFASSFileDialogueTextRef CFASSFileDialogueTextCreateWithString(const wchar_t *source)
+CFASSFileDialogueTextRef CFASSFileDialogueTextCreateWithString(const wchar_t * _Nonnull source,
+                                                               CFASSFileParsingResultRef _Nonnull parsingResult)
 {
+    DEBUG_ASSERT(source != NULL && parsingResult != NULL);
+    if(source == NULL || parsingResult == NULL) return NULL;
+    
     CFASSFileDialogueTextRef result;
     CFASSFileDialogueTextContentRef eachContent;
     
-    const wchar_t *beginPoint, *endPoint;
-    endPoint = wcsstr(source, L"\n");
-    if(endPoint == NULL) endPoint = source + wcslen(source);
+    const wchar_t *contentEndPoint;
+    contentEndPoint = wcsstr(source, L"\n");                                  // contentEndPoint to '\n'
+    if(contentEndPoint == NULL) contentEndPoint = source + wcslen(source);    // contentEndPoint to '\0'
+    
     if((result = malloc(sizeof(struct CFASSFileDialogueText))) != NULL)
     {
         if((result->contentArray = CFPointerArrayCreateEmpty()) != NULL)
         {
-            if(endPoint == source)
+            if(contentEndPoint == source)
             {
                 if((eachContent = CFASSFileDialogueTextContentCreateEmptyString()) != NULL)
                 {
                     CFPointerArrayAddPointer(result->contentArray, eachContent, false);
                     return result;
-                }
+                } else PR_INFO(NULL, L"CFASSFileDialogueTextContent create empty failed");
             }
             else
             {
-                beginPoint = source;
-                
-                bool isFormatCorrect = true;
-                CFASSFileDialogueTextContentType contentType;
-                do
-                {
-                    if(*beginPoint == L'{') contentType = CFASSFileDialogueTextContentTypeOverride;
-                    else contentType = CFASSFileDialogueTextContentTypeText;
-                    if((eachContent = CFASSFileDialogueTextContentCreateWithString(contentType, beginPoint, endPoint - 1)) != NULL)
-                    {
-                        CFPointerArrayAddPointer(result->contentArray, eachContent, false);
-                        if(*beginPoint == L'{')
+                CFPointerArrayRef seperationArray;
+                if((seperationArray = CFASSFileDialogueTextCreateArrayForSeperateRawString(source)) != NULL) {
+                    size_t count = CFPointerArrayGetCount(seperationArray); DEBUG_ASSERT(count != 0 && count % 2 == 0);
+                    if(count == 0 || count % 2 != 0) {    // impossible
+                        if((eachContent = CFASSFileDialogueTextContentCreateEmptyString()) != NULL)
                         {
-                            beginPoint+=2;      // think about it
-                            while (beginPoint<endPoint && *(beginPoint-1)!=L'}') beginPoint++;
-                        }
-                        else
-                            while (beginPoint<endPoint && *beginPoint!= L'{') beginPoint++;
+                            CFPointerArrayAddPointer(result->contentArray, eachContent, false);
+                            CFPointerArrayDestory(seperationArray);
+                            return result;
+                        } else PR_INFO(NULL, L"CFASSFileDialogueTextContent create empty string failed");
+                        DEBUG_POINT // create empty string failed ?
                     }
-                    else isFormatCorrect = false;
-                }while(isFormatCorrect && beginPoint < endPoint);
-                
-                if(isFormatCorrect)
-                    return result;
+                    else {
+                        CFASSFileControlLevel controlLevel = CFASSFileControlGetLevel();
+                        
+                        bool formatCheck = true;
+                        
+                        for(size_t index = 0; index < count; index += 2) {
+                            const wchar_t *beginPoint = CFPointerArrayGetPointerAtIndex(seperationArray, index);
+                            const wchar_t *endPoint = CFPointerArrayGetPointerAtIndex(seperationArray, index + 1);
+                            DEBUG_ASSERT(endPoint >= beginPoint && endPoint[0] != L'\n' && endPoint[0] != L'\0');
+                            CFASSFileDialogueTextContentType contentType;
+                            if(beginPoint[0] == L'{') contentType = CFASSFileDialogueTextContentTypeOverride;
+                            else contentType = CFASSFileDialogueTextContentTypeText;
+                            if((eachContent = CFASSFileDialogueTextContentCreateWithString(contentType, beginPoint, endPoint, parsingResult)) != NULL)
+                                CFPointerArrayAddPointer(result->contentArray, eachContent, false);
+                            else {
+                                PR_ERROR(beginPoint, L"CFASSFileDialogueTextContent create failed");
+                                if(!(controlLevel & CFASSFileControlLevelIgnore)) {
+                                    formatCheck = false;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if(formatCheck) {
+                            CFPointerArrayDestory(seperationArray);
+                            return result;
+                        }
+                    }
+                    
+                    CFPointerArrayDestory(seperationArray);
+                } else PR_ERROR(source, L"CFASSFileDialogueText content format error");
             }
-            size_t arrayLength = CFPointerArrayGetLength(result->contentArray);
-            for(unsigned int index = 0; index<arrayLength; index++)
+            
+            size_t arrayCount = CFPointerArrayGetCount(result->contentArray);
+            for(unsigned int index = 0; index < arrayCount; index++)
                 CFASSFileDialogueTextContentDestory((CFASSFileDialogueTextContentRef)
                                                     CFPointerArrayGetPointerAtIndex(result->contentArray, index));
+            
             CFPointerArrayDestory(result->contentArray);
-        }
+        } else PR_INFO(NULL, L"CFASSFileDialogueText create contentArray failed");
         free(result);
-    }
+    } else PR_INFO(NULL, L"CFASSFileDialogueText allocation failed");
     return NULL;
 }
 
 void CFASSFileDialogueTextDestory(CFASSFileDialogueTextRef dialogueText)
 {
-    size_t arrayLength = CFPointerArrayGetLength(dialogueText->contentArray);   
-    for(unsigned int index = 0; index<arrayLength; index++)
+    size_t arrayCount = CFPointerArrayGetCount(dialogueText->contentArray);   
+    for(unsigned int index = 0; index<arrayCount; index++)
         CFASSFileDialogueTextContentDestory((CFASSFileDialogueTextContentRef)CFPointerArrayGetPointerAtIndex(dialogueText->contentArray, index));
     CFPointerArrayDestory(dialogueText->contentArray);
     free(dialogueText);
 }
 
-void function(void)
-{
-    int temp = 0;
-    if(temp == '{') return;
+/*!
+ @function CFASSFileDialogueTextCreateArrayForSeperateRawString
+ @abstract seperate raw dialogueText string into override or plainText
+ @discussion remind of escape sequence and overrides
+             escape sequence '\\n' '\N' '\h' '\{'
+             override {...} disable all escape sequence
+ @param string content begin, may begin '\0' or '\\n'
+        must end with '\0' or '\\n'
+ @return CFPointerArray object if seperation complete, or NULL if error happen
+         its content should be doubled, as one for beginPoint, one for endPoint
+         just enclosing each content part
+ */
+static CFPointerArrayRef _Nullable CFASSFileDialogueTextCreateArrayForSeperateRawString(const wchar_t * _Nonnull string) {
+    DEBUG_ASSERT(string != NULL); if(string == NULL) return NULL;
+    CFPointerArrayRef array;
+    if((array = CFPointerArrayCreateEmpty()) != NULL) {
+        const wchar_t *searchPoint = string;
+        bool formatCheck = true;
+        while(searchPoint[0] != L'\n' && searchPoint[0] != L'\0') {
+            if(searchPoint[0] == L'{') {
+                const wchar_t *endPoint = searchPoint;      // endPoint to '}' or just error happened to '\0' or '\n'
+                while(endPoint[0] != L'}' && endPoint[0] != L'\0' && endPoint[0] != L'\0') endPoint++;
+                if(endPoint[0] != L'}') {
+                    formatCheck = false;
+                    break;  // format match failure
+                }
+                CFPointerArrayAddPointer(array, (void *)searchPoint, false);
+                CFPointerArrayAddPointer(array, (void *)endPoint, false);
+                searchPoint = endPoint + 1;
+            }
+            else {
+                const wchar_t *endPoint = searchPoint;
+                
+                // advance end to the '\0' and '\n' or just another override '{' begin
+                // note: don't forget escape sequence '\{'
+                DEBUG_ASSERT(endPoint[0] != L'{');
+                LOOP {
+                    if(endPoint[0] == L'\\' && endPoint[1] == L'{')
+                        endPoint++;
+                    else if(endPoint[0] == L'{' || endPoint[0] == L'\0' || endPoint[0] == L'\n')
+                        break;
+                    endPoint++;
+                }
+                DEBUG_ASSERT(endPoint > searchPoint);
+                CFPointerArrayAddPointer(array, (void *)searchPoint, false);
+                CFPointerArrayAddPointer(array, (void *)(endPoint - 1), false);
+                searchPoint = endPoint;
+            }
+        }
+        if(formatCheck) return array;
+        CFPointerArrayDestory(array);
+    }
+    return NULL;
 }
+
+CLANG_DIAGNOSTIC_POP

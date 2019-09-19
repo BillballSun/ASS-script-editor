@@ -19,11 +19,11 @@
 #include "CFException.h"
 #include "CFASSFileChange.h"
 #include "CFASSFileChange_Private.h"
+#include "CFASSFileParsingResult.h"
+#include "CFASSFileParsingResult_Macro.h"
 
 #define CFASSFileScriptInfoSearchEachContentName(WSTR) (L"\n" WSTR L":")
-
 #define CFASSFileScriptInfoFileContentSearchInOrder 1
-
 struct CFASSFileScriptInfo {
     CFUnicodeStringArrayRef comment;
     wchar_t *title,                 // This is a description of the script
@@ -44,6 +44,9 @@ struct CFASSFileScriptInfo {
     unsigned int wrap_style;        // (optional)0 - 4
     CFASSFileRef registeredFile;    // don't have ownership
 };
+
+CLANG_DIAGNOSTIC_PUSH
+CLANG_DIAGNOSTIC_IGNORE_NONNULL
 
 void CFASSFileScriptInfoMakeChange(CFASSFileScriptInfoRef scriptInfo, CFASSFileChangeRef change)
 {
@@ -67,11 +70,15 @@ int CFASSFileScriptInfoRegisterAssociationwithFile(CFASSFileScriptInfoRef script
         return -1;
 }
 
+#pragma mark - construction for output
+
 wchar_t *CFASSFileScriptInfoAllocateFileContent(CFASSFileScriptInfoRef scriptInfo)
 {
-    size_t commentAmount = CFUnicodeStringArrayGetLength(scriptInfo->comment),
+    size_t commentAmount = CFUnicodeStringArrayGetCount(scriptInfo->comment),
     scriptStringLength = 0;
     int temp;
+    
+#pragma mark caculation of size
     
     scriptStringLength += wcslen(L"[Script Info]\n");
     
@@ -82,175 +89,179 @@ wchar_t *CFASSFileScriptInfoAllocateFileContent(CFASSFileScriptInfoRef scriptInf
     if((fp=tmpfile()) == NULL) return NULL;
     
     temp =
-    fwprintf(fp, L"Title:%ls\n"
-                 L"Original Script:%ls\n",
-                scriptInfo->title==NULL?L"":scriptInfo->title,
-                scriptInfo->original_script==NULL?L"":scriptInfo->original_script);
-    if(temp<0) {fclose(fp); return NULL;}
-    else scriptStringLength+=temp;
+    fwprintf(fp, L"Title: %ls\n"
+                 L"Original Script: %ls\n",
+                scriptInfo->title == NULL ? L"" : scriptInfo->title,
+                scriptInfo->original_script == NULL ? L"" : scriptInfo->original_script);
+    if(temp < 0) { fclose(fp); return NULL; }
+    else scriptStringLength += temp;
     
-    if(scriptInfo->original_translation!=NULL) {
-        temp = fwprintf(fp, L"Original Translation:%ls\n", scriptInfo->original_translation);
-        if(temp<0) {fclose(fp); return NULL;}
-        else scriptStringLength+=temp;
+    if(scriptInfo->original_translation != NULL) {
+        temp = fwprintf(fp, L"Original Translation: %ls\n", scriptInfo->original_translation);
+        if(temp < 0) { fclose(fp); return NULL; }
+        else scriptStringLength += temp;
     }
-    if(scriptInfo->original_editing!=NULL) {
-        temp = fwprintf(fp, L"Original Editing:%ls\n", scriptInfo->original_editing);
-        if(temp<0) {fclose(fp); return NULL;}
-        else scriptStringLength+=temp;
+    if(scriptInfo->original_editing != NULL) {
+        temp = fwprintf(fp, L"Original Editing: %ls\n", scriptInfo->original_editing);
+        if(temp < 0) { fclose(fp); return NULL; }
+        else scriptStringLength += temp;
     }
-    if(scriptInfo->original_timing!=NULL) {
-        temp = fwprintf(fp, L"Original Timing:%ls\n", scriptInfo->original_timing);
-        if(temp<0) {fclose(fp); return NULL;}
-        else scriptStringLength+=temp;
+    if(scriptInfo->original_timing != NULL) {
+        temp = fwprintf(fp, L"Original Timing: %ls\n", scriptInfo->original_timing);
+        if(temp < 0) { fclose(fp); return NULL; }
+        else scriptStringLength += temp;
     }
-    if(scriptInfo->synch_point!=NULL) {
-        temp = fwprintf(fp, L"Synch Point:%ls\n", scriptInfo->synch_point);
-        if(temp<0) {fclose(fp); return NULL;}
-        else scriptStringLength+=temp;
+    if(scriptInfo->synch_point != NULL) {
+        temp = fwprintf(fp, L"Synch Point: %ls\n", scriptInfo->synch_point);
+        if(temp < 0) { fclose(fp); return NULL; }
+        else scriptStringLength += temp;
     }
-    if(scriptInfo->script_updated_by!=NULL) {
-        temp = fwprintf(fp, L"Script Updated By:%ls\n", scriptInfo->script_updated_by);
-        if(temp<0) {fclose(fp); return NULL;}
-        else scriptStringLength+=temp;
+    if(scriptInfo->script_updated_by != NULL) {
+        temp = fwprintf(fp, L"Script Updated By: %ls\n", scriptInfo->script_updated_by);
+        if(temp < 0) { fclose(fp); return NULL; }
+        else scriptStringLength += temp;
     }
-    if(scriptInfo->update_details!=NULL) {
-        temp = fwprintf(fp, L"Update Details:%ls\n", scriptInfo->update_details);
-        if(temp<0) {fclose(fp); return NULL;}
-        else scriptStringLength+=temp;
+    if(scriptInfo->update_details != NULL) {
+        temp = fwprintf(fp, L"Update Details: %ls\n", scriptInfo->update_details);
+        if(temp < 0) {fclose(fp); return NULL;}
+        else scriptStringLength += temp;
     }
-    if(scriptInfo->script_type!=NULL) {
-        temp = fwprintf(fp, L"ScriptType:%ls\n", scriptInfo->script_type);
-        if(temp<0) {fclose(fp); return NULL;}
-        else scriptStringLength+=temp;
+    if(scriptInfo->script_type != NULL) {
+        temp = fwprintf(fp, L"ScriptType: %ls\n", scriptInfo->script_type);
+        if(temp < 0) { fclose(fp); return NULL; }
+        else scriptStringLength += temp;
     }
     
     if(scriptInfo->is_collisions_normal)
-        scriptStringLength+=wcslen(L"Collisions:Normal\n");
+        scriptStringLength+=wcslen(L"Collisions: Normal\n");
     else
-        scriptStringLength+=wcslen(L"Collisions:Reversed\n");
+        scriptStringLength+=wcslen(L"Collisions: Reversed\n");
     
     temp =
-    fwprintf(fp, L"PlayResX:%u\n"
-                 L"PlayResY:%u\n",
+    fwprintf(fp, L"PlayResX: %u\n"
+                 L"PlayResY: %u\n",
                  scriptInfo->play_res_x,
                  scriptInfo->play_res_y);
-    if(temp<0) {fclose(fp); return NULL;}
-    else scriptStringLength+=temp;
+    if(temp < 0) {fclose(fp); return NULL;}
+    else scriptStringLength += temp;
     
-    if(scriptInfo->play_depth!=NULL) {
-        temp = fwprintf(fp, L"PlayDepth:%ls\n", scriptInfo->play_depth);
-        if(temp<0) {fclose(fp); return NULL;}
-        else scriptStringLength+=temp;
+    if(scriptInfo->play_depth != NULL) {
+        temp = fwprintf(fp, L"PlayDepth: %ls\n", scriptInfo->play_depth);
+        if(temp < 0) { fclose(fp); return NULL; }
+        else scriptStringLength += temp;
     }
     
     temp =
-    fwprintf(fp, L"Timer:%.4f\n"
-                 L"WrapStyle:%u\n",
+    fwprintf(fp, L"Timer: %.4f\n"
+                 L"WrapStyle: %u\n",
                  scriptInfo->timer,
                  scriptInfo->wrap_style);
-    if(temp<0) {fclose(fp); return NULL;}
-    else scriptStringLength+=temp;
+    if(temp < 0) { fclose(fp); return NULL; }
+    else scriptStringLength += temp;
+    
+#pragma mark output
     
     wchar_t *result;
-    if((result = malloc(sizeof(wchar_t)*(scriptStringLength+1))) == NULL)
-        {fclose(fp); return NULL;}
+    if((result = malloc(sizeof(wchar_t) * (scriptStringLength + 1))) == NULL)
+        { fclose(fp); return NULL; }
     
     wchar_t *writingPoint = result;
     
-    temp = swprintf(writingPoint, scriptStringLength+1, L"[Script Info]\n");
-    writingPoint+=temp; scriptStringLength-=temp;
+    temp = swprintf(writingPoint, scriptStringLength + 1, L"[Script Info]\n");
+    writingPoint += temp; scriptStringLength -= temp;
     
-    for(size_t count = 1; count<=commentAmount; count++)
+    for(size_t count = 1; count <= commentAmount; count++)
     {
-        temp = swprintf(writingPoint, scriptStringLength+1, L";%ls\n", CFUnicodeStringArrayGetStringAtIndex(scriptInfo->comment, count-1));
-        writingPoint+=temp; scriptStringLength-=temp;
+        temp = swprintf(writingPoint, scriptStringLength + 1, L";%ls\n", CFUnicodeStringArrayGetStringAtIndex(scriptInfo->comment, count-1));
+        writingPoint += temp; scriptStringLength -= temp;
     }
     
     temp =
-    swprintf(writingPoint, scriptStringLength+1,
-             L"Title:%ls\n"
-             L"Original Script:%ls\n",
-             scriptInfo->title==NULL?L"":scriptInfo->title,
-             scriptInfo->original_script==NULL?L"":scriptInfo->original_script);
-    writingPoint+=temp; scriptStringLength-=temp;
+    swprintf(writingPoint, scriptStringLength + 1,
+             L"Title: %ls\n"
+             L"Original Script: %ls\n",
+             scriptInfo->title == NULL ? L"" : scriptInfo->title,
+             scriptInfo->original_script == NULL ? L"" : scriptInfo->original_script);
+    writingPoint += temp; scriptStringLength -= temp;
     
-    if(scriptInfo->original_translation!=NULL) {
+    if(scriptInfo->original_translation != NULL) {
         temp =
-        swprintf(writingPoint, scriptStringLength+1,
-                 L"Original Translation:%ls\n", scriptInfo->original_translation);
-        writingPoint+=temp; scriptStringLength-=temp;
+        swprintf(writingPoint, scriptStringLength + 1,
+                 L"Original Translation: %ls\n", scriptInfo->original_translation);
+        writingPoint += temp; scriptStringLength -= temp;
     }
-    if(scriptInfo->original_editing!=NULL) {
+    if(scriptInfo->original_editing != NULL) {
         temp =
-        swprintf(writingPoint, scriptStringLength+1,
-                 L"Original Editing:%ls\n", scriptInfo->original_editing);
-        writingPoint+=temp; scriptStringLength-=temp;
+        swprintf(writingPoint, scriptStringLength + 1,
+                 L"Original Editing: %ls\n", scriptInfo->original_editing);
+        writingPoint += temp; scriptStringLength -= temp;
     }
-    if(scriptInfo->original_timing!=NULL) {
+    if(scriptInfo->original_timing != NULL) {
         temp =
-        swprintf(writingPoint, scriptStringLength+1,
-                 L"Original Timing:%ls\n", scriptInfo->original_timing);
-        writingPoint+=temp; scriptStringLength-=temp;
+        swprintf(writingPoint, scriptStringLength + 1,
+                 L"Original Timing: %ls\n", scriptInfo->original_timing);
+        writingPoint += temp; scriptStringLength -= temp;
     }
-    if(scriptInfo->synch_point!=NULL) {
+    if(scriptInfo->synch_point != NULL) {
         temp =
-        swprintf(writingPoint, scriptStringLength+1,
-                 L"Synch Point:%ls\n", scriptInfo->synch_point);
-        writingPoint+=temp; scriptStringLength-=temp;
+        swprintf(writingPoint, scriptStringLength + 1,
+                 L"Synch Point: %ls\n", scriptInfo->synch_point);
+        writingPoint += temp; scriptStringLength -= temp;
     }
-    if(scriptInfo->script_updated_by!=NULL) {
+    if(scriptInfo->script_updated_by != NULL) {
         temp =
-        swprintf(writingPoint, scriptStringLength+1,
-                 L"Script Updated By:%ls\n", scriptInfo->script_updated_by);
-        writingPoint+=temp; scriptStringLength-=temp;
+        swprintf(writingPoint, scriptStringLength + 1,
+                 L"Script Updated By: %ls\n", scriptInfo->script_updated_by);
+        writingPoint += temp; scriptStringLength -= temp;
     }
-    if(scriptInfo->update_details!=NULL) {
+    if(scriptInfo->update_details != NULL) {
         temp =
-        swprintf(writingPoint, scriptStringLength+1,
-                 L"Update Details:%ls\n", scriptInfo->update_details);
-        writingPoint+=temp; scriptStringLength-=temp;
+        swprintf(writingPoint, scriptStringLength + 1,
+                 L"Update Details: %ls\n", scriptInfo->update_details);
+        writingPoint += temp; scriptStringLength -= temp;
     }
-    if(scriptInfo->script_type!=NULL) {
+    if(scriptInfo->script_type != NULL) {
         temp =
-        swprintf(writingPoint, scriptStringLength+1,
-                 L"ScriptType:%ls\n", scriptInfo->script_type);
-        writingPoint+=temp; scriptStringLength-=temp;
+        swprintf(writingPoint, scriptStringLength + 1,
+                 L"ScriptType: %ls\n", scriptInfo->script_type);
+        writingPoint += temp; scriptStringLength -= temp;
     }
     
     if(scriptInfo->is_collisions_normal)
     {
         temp =
-        swprintf(writingPoint, scriptStringLength+1, L"Collisions:Normal\n");
-        writingPoint+=temp; scriptStringLength-=temp;
+        swprintf(writingPoint, scriptStringLength + 1, L"Collisions: Normal\n");
+        writingPoint += temp; scriptStringLength -= temp;
     }
     else
     {
         temp =
-        swprintf(writingPoint, scriptStringLength+1, L"Collisions:Reversed\n");
-        writingPoint+=temp; scriptStringLength-=temp;
+        swprintf(writingPoint, scriptStringLength + 1, L"Collisions: Reversed\n");
+        writingPoint += temp; scriptStringLength -= temp;
     }
     
     temp =
-    swprintf(writingPoint, scriptStringLength+1,
-             L"PlayResX:%u\n"
-             L"PlayResY:%u\n",
+    swprintf(writingPoint, scriptStringLength + 1,
+             L"PlayResX: %u\n"
+             L"PlayResY: %u\n",
              scriptInfo->play_res_x,
              scriptInfo->play_res_y);
-    writingPoint+=temp; scriptStringLength-=temp;
+    writingPoint += temp; scriptStringLength -= temp;
     
-    if(scriptInfo->play_depth!=NULL) {
-        temp = swprintf(writingPoint, scriptStringLength+1,
-                 L"PlayDepth:%ls\n", scriptInfo->play_depth);
-        writingPoint+=temp; scriptStringLength-=temp;
+    if(scriptInfo->play_depth != NULL) {
+        temp = swprintf(writingPoint, scriptStringLength + 1,
+                 L"PlayDepth: %ls\n", scriptInfo->play_depth);
+        writingPoint += temp; scriptStringLength -= temp;
     }
     temp =
-    swprintf(writingPoint, scriptStringLength+1,
-             L"Timer:%.4f\n"
-             L"WrapStyle:%u\n",
+    swprintf(writingPoint, scriptStringLength + 1,
+             L"Timer: %.4f\n"
+             L"WrapStyle: %u\n",
              scriptInfo->timer,
              scriptInfo->wrap_style);
-    // writingPoint+=temp; scriptStringLength-=temp;
+    // writingPoint += temp; scriptStringLength -= temp;
+    
+    DEBUG_ASSERT((scriptStringLength -= temp) == 0);
     
     fclose(fp);
     return result;
@@ -277,8 +288,8 @@ CFASSFileScriptInfoRef CFASSFileScriptInfoCreateEssential(wchar_t *title,
             result->original_editing = NULL; result->original_timing = NULL; result->synch_point = NULL;
             result->script_updated_by = NULL; result->update_details = NULL; result->script_type = NULL;
             result->play_depth = NULL;
-            if(title==NULL || (result->title=CF_Dump_wchar_string(title))!=NULL){
-                if(original_script==NULL || (result->original_script=CF_Dump_wchar_string(original_script))!=NULL){
+            if(title == NULL || (result->title=CF_Dump_wchar_string(title)) != NULL){
+                if(original_script == NULL || (result->original_script=CF_Dump_wchar_string(original_script)) != NULL){
                     result->is_collisions_normal = is_collisions_normal;
                     result->play_res_x = play_res_x;
                     result->play_res_y = play_res_y;
@@ -296,14 +307,19 @@ CFASSFileScriptInfoRef CFASSFileScriptInfoCreateEssential(wchar_t *title,
     return NULL;
 }
 
-CFASSFileScriptInfoRef CFASSFileScriptInfoCreateWithUnicodeFileContent(const wchar_t *content)
-{
-    CFASSFileScriptInfoRef result;
-    if((result = malloc(sizeof(struct CFASSFileScriptInfo))) == NULL)
-        return NULL;
+CFASSFileScriptInfoRef CFASSFileScriptInfoCreateWithUnicodeFileContent(const wchar_t * _Nonnull content,
+                                                                       CFASSFileParsingResultRef _Nonnull parsingResult) {
+    DEBUG_ASSERT(content != NULL && parsingResult != NULL);
+    if(content == NULL || parsingResult == NULL) return NULL;
     
-    if((result->comment = CFUnicodeStringArrayCreateEmpty()) == NULL)
-    {
+    CFASSFileScriptInfoRef result;
+    if((result = malloc(sizeof(struct CFASSFileScriptInfo))) == NULL) {
+        PR_INFO(NULL, L"CFASSFileScriptInfo allocation failed");
+        return NULL;
+    }
+    
+    if((result->comment = CFUnicodeStringArrayCreateEmpty()) == NULL) {
+        PR_INFO(NULL, L"CFASSFileScriptInfo comment intialization failed");
         free(result);
         return NULL;
     }
@@ -311,37 +327,39 @@ CFASSFileScriptInfoRef CFASSFileScriptInfoCreateWithUnicodeFileContent(const wch
     
     const wchar_t *beginPoint = content;
     
-    int scanAmount = 0;
-    int compareResult = wmemcmp(beginPoint, L"[Script Info]\n", wcslen(L"[Script Info]\n"));
-    if(compareResult!=0)
-    {
+    int compareResult;
+    if((compareResult = wmemcmp(beginPoint, L"[Script Info]\n", wcslen(L"[Script Info]\n"))) != 0) {
         CFUnicodeStringArrayDestory(result->comment);
         free(result);
+        PR_ERROR(beginPoint, L"file not begin with [Script Info], parsing content stop");
         return NULL;
     }
     beginPoint += wcslen(L"[Script Info]\n");
     
     const wchar_t *endPoint;
-    if((endPoint = wcsstr(beginPoint, L"\n[V4+ Styles]"))==NULL)
-    {
+    if((endPoint = wcsstr(beginPoint, L"\n[V4+ Styles]")) == NULL) {
         CFUnicodeStringArrayDestory(result->comment);
         free(result);
+        PR_ERROR(beginPoint, L"[V4+ Styles] not found, script format not supported, parsing content stop");
         return NULL;
     }
-    
     bool encounterEndChar; size_t length;
-    while(*beginPoint == L';')
-    {
-        length = CFUnicodeStringArrayAddStringWithEndChar(result->comment, beginPoint+1, L'\n', &encounterEndChar);
-        if(!encounterEndChar)
-        {
+    while(*beginPoint == L';') {    // comment begin sign
+        length = CFUnicodeStringArrayAddStringWithEndChar(result->comment, beginPoint + 1, L'\n', &encounterEndChar);
+        if(!encounterEndChar) {
             CFUnicodeStringArrayDestory(result->comment);
             free(result);
+            PR_ERROR(beginPoint, L"comment begin ; detected without matching line terminate");
             return NULL;
         }
-        beginPoint += length+2;
+        beginPoint += length + 2;   // percede to next ';' or other
     }
-    beginPoint--;
+    beginPoint--;                   // backoff make space for '\n', this always valid as "[Script Info]\n" first searched
+    
+    int scanAmount = 0;
+    
+    // begin point set to '\n', just after "[Script Info]" or any comments
+    //   end point set to '\n' just before "[V4+ Styles]"
     
     #if CFASSFileScriptInfoFileContentSearchInOrder
     
@@ -352,70 +370,74 @@ CFASSFileScriptInfoRef CFASSFileScriptInfoCreateWithUnicodeFileContent(const wch
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
     
     result->original_script =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Original Script"),
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
+    
     result->original_translation =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Original Translation"),
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
     
     result->original_editing =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Original Editing"),
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
     
     result->original_timing =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Original Timing"),
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
     
     result->synch_point =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Synch Point"),
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
     
     result->script_updated_by =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Script Updated By"),
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
     
     result->update_details =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Update Details"),
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
     
     result->script_type =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"ScriptType"),
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
     
-    const wchar_t *dataPoint;
+    /* begin of content interprate */
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"Collisions"),
-                                          endPoint))!=NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"Collisions"));
+    wchar_t *dataPoint;
+    
+    /* Collisions */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Collisions"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       &skipAmount);
+    if(dataPoint != NULL) {
         scanAmount = 0;
         swscanf(dataPoint, L"Normal%n", &scanAmount);
         if(scanAmount == wcslen(L"Normal"))
@@ -424,69 +446,89 @@ CFASSFileScriptInfoRef CFASSFileScriptInfoCreateWithUnicodeFileContent(const wch
         {
             scanAmount = 0;
             swscanf(dataPoint, L"Reverse%n", &scanAmount);
-            if(scanAmount == wcslen(L"Reverse"))
-                result->is_collisions_normal = false;
-            else
+            if(scanAmount == wcslen(L"Reverse")) result->is_collisions_normal = false;
+            else {
+                PR_WARN(beginPoint, L"unkown Collisions format: %ls, default to normal", dataPoint);
                 result->is_collisions_normal = true;
+            }
         }
-        do beginPoint++; while(*beginPoint!=L'\n');
+        free(dataPoint);
     }
-    else
-        result->is_collisions_normal = true;
+    else result->is_collisions_normal = true;
+    beginPoint += skipAmount;
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"PlayResX"),
-                                          endPoint)) != NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"PlayResX"));
-        if(swscanf(dataPoint, L"%u", &result->play_res_x) != 1)
+    
+    /* PlayResX */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"PlayResX"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       &skipAmount);
+    if(dataPoint != NULL) {
+        if(swscanf(dataPoint, L"%u", &result->play_res_x) != 1) {
+            PR_WARN(beginPoint, L"unable to parse PlayResX: %ls, default to zero", dataPoint);
             result->play_res_x = 0u;
-        do beginPoint++; while(*beginPoint!=L'\n');
+        }
+        free(dataPoint);
     }
-    else
-        result->play_res_x = 0u;
+    else result->play_res_x = 0u;
+    beginPoint += skipAmount;
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"PlayResY"),
-                                          endPoint)) != NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"PlayResY"));
-        if(swscanf(dataPoint, L"%u", &result->play_res_y) != 1)
+    
+    /* PlayResY */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"PlayResY"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       &skipAmount);
+    if(dataPoint != NULL) {
+        if(swscanf(dataPoint, L"%u", &result->play_res_y) != 1) {
+            PR_WARN(beginPoint, L"unable to parse PlayResY: %ls, default to zero", dataPoint);
             result->play_res_y = 0u;
-        do beginPoint++; while(*beginPoint!=L'\n');
+        }
+        free(dataPoint);
     }
-    else
-        result->play_res_y = 0u;
+    else result->play_res_y = 0u;
+    beginPoint += skipAmount;
     
+    
+    /* PlayDepth */
     result->play_depth =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"PlayDepth"),
                                            beginPoint,
                                            endPoint,
                                            &skipAmount);
-    beginPoint+=skipAmount;
+    beginPoint += skipAmount;
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"Timer"),
-                                          endPoint)) != NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"Timer"));
-        if(swscanf(dataPoint, L"%lf", &result->timer) != 1)
+    
+    /* Timer */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Timer"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       &skipAmount);
+    if(dataPoint != NULL) {
+        if(swscanf(dataPoint, L"%lf", &result->timer) != 1) {
+            PR_WARN(beginPoint, L"unable to parse Timer(speed): %ls, default to zero", dataPoint);
             result->timer = 100.0;
-        do beginPoint++; while(*beginPoint!=L'\n');
+        }
+        free(dataPoint);
     }
-    else
-        result->timer = 100.0;
+    else result->timer = 100.0;
+    beginPoint += skipAmount;
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"WrapStyle"),
-                                          endPoint))!=NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"WrapStyle"));
-        if(swscanf(dataPoint, L"%u", &result->wrap_style)!=1 || result->wrap_style > 4)
+        
+    /* WrapStyle */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"WrapStyle"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       &skipAmount);
+    if(dataPoint != NULL) {
+        if(swscanf(dataPoint, L"%u", &result->wrap_style) != 1 || result->wrap_style > 4) {
+            PR_WARN(beginPoint, L"unable to parse WrapStyle: %ls, default to zero", dataPoint);
             result->wrap_style = 0u;
+        }
+        free(dataPoint);
     }
-    else
-        result->wrap_style = 0u;
+    else result->wrap_style = 0u;
+    beginPoint += skipAmount;
     
     #else
     
@@ -536,13 +578,14 @@ CFASSFileScriptInfoRef CFASSFileScriptInfoCreateWithUnicodeFileContent(const wch
                                            endPoint,
                                            NULL);
     
-    const wchar_t *dataPoint;
+    wchar_t *dataPoint;
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"Collisions"),
-                                          endPoint))!=NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"Collisions"));
+    /* Collisions */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Collisions"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       NULL);
+    if(dataPoint != NULL) {
         scanAmount = 0;
         swscanf(dataPoint, L"Normal%n", &scanAmount);
         if(scanAmount == wcslen(L"Normal"))
@@ -551,97 +594,131 @@ CFASSFileScriptInfoRef CFASSFileScriptInfoCreateWithUnicodeFileContent(const wch
         {
             scanAmount = 0;
             swscanf(dataPoint, L"Reverse%n", &scanAmount);
-            if(scanAmount == wcslen(L"Reverse"))
-                result->is_collisions_normal = false;
-            else
+            if(scanAmount == wcslen(L"Reverse")) result->is_collisions_normal = false;
+            else {
+                PR_WARN(beginPoint, L"unkown Collisions format: %ls, default to normal", dataPoint);
                 result->is_collisions_normal = true;
+            }
         }
+        free(dataPoint);
     }
-    else
-        result->is_collisions_normal = true;
+    else result->is_collisions_normal = true;
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"PlaResX"),
-                                          endPoint)) != NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"PlaResX"));
-        if(swscanf(dataPoint, L"%u", &result->play_res_x) != 1)
+    /* PlayResX */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"PlayResX"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       NULL);
+    if(dataPoint != NULL) {
+        if(swscanf(dataPoint, L"%u", &result->play_res_x) != 1) {
+            PR_WARN(beginPoint, L"unable to parse PlayResX: %ls, default to zero", dataPoint);
             result->play_res_x = 0u;
+        }
+        free(dataPoint);
     }
-    else
-        result->play_res_x = 0u;
+    else result->play_res_x = 0u;
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"PlaResY"),
-                                          endPoint)) != NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"PlaResY"));
-        if(swscanf(dataPoint, L"%u", &result->play_res_y) != 1)
+    /* PlayResY */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"PlayResY"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       NULL);
+    if(dataPoint != NULL) {
+        if(swscanf(dataPoint, L"%u", &result->play_res_y) != 1) {
+            PR_WARN(beginPoint, L"unable to parse PlayResY: %ls, default to zero", dataPoint);
             result->play_res_y = 0u;
+        }
+        free(dataPoint);
     }
-    else
-        result->play_res_y = 0u;
+    else result->play_res_y = 0u;
     
+    /* PlayDepth */
     result->play_depth =
     CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"PlayDepth"),
                                            beginPoint,
                                            endPoint,
                                            NULL);
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"Timer"),
-                                          endPoint)) != NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"Timer"));
-        if(swscanf(dataPoint, L"%lf", &result->timer) != 1)
+    /* Timer */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"Timer"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       NULL);
+    if(dataPoint != NULL) {
+        if(swscanf(dataPoint, L"%lf", &result->timer) != 1) {
+            PR_WARN(beginPoint, L"unable to parse Timer(speed): %ls, default to zero", dataPoint);
             result->timer = 100.0;
+        }
+        free(dataPoint);
     }
-    else
-        result->timer = 100.0;
+    else result->timer = 100.0;
     
-    if((dataPoint = CF_wcsstr_with_end_point(beginPoint,
-                                          CFASSFileScriptInfoSearchEachContentName(L"WrapStyle"),
-                                          endPoint))!=NULL)
-    {
-        dataPoint += wcslen(CFASSFileScriptInfoSearchEachContentName(L"WrapStyle"));
-        if(swscanf(dataPoint, L"%u", &result->wrap_style)!=1 || result->wrap_style > 4)
+    /* WrapStyle */
+    dataPoint = CFASSFileScriptInfoAllocateEachContent(CFASSFileScriptInfoSearchEachContentName(L"WrapStyle"),
+                                                       beginPoint,
+                                                       endPoint,
+                                                       NULL);
+    if(dataPoint != NULL) {
+        if(swscanf(dataPoint, L"%u", &result->wrap_style) != 1 || result->wrap_style > 4) {
+            PR_WARN(beginPoint, L"unable to parse WrapStyle: %ls, default to zero", dataPoint);
             result->wrap_style = 0u;
+        }
+        free(dataPoint);
     }
-    else
-        result->wrap_style = 0u;
+    else result->wrap_style = 0u;
     
     #endif
     
     return result;
 }
 
+/*!
+ @function CFASSFileScriptInfoAllocateEachContent
+ @abstract search for string within [beginPoint, endPoint] for string start with
+           name. That is (beginPoint, nameBegin, nameEnd, endPoint), then try to
+           search '\\n' within [nameEnd + 1, endPoint] if possible, find the
+           returnPoint, if [nameEnd + 1, returnPoint - 1] makes some string,
+           that string is actually returned. Note that prefixed blank is not
+           ignore, but considered as content.
+ @param name the match name, sample "\nTitile:"
+ @param beginPoint the beginPoint to search for content
+ @param endPoint the lastPoint to search for content
+ @param shouldSkip if not NULL, this should always returned an interpreted skip
+        length, which should skipped the trying search part
+ @return only when [nameEnd + 1, returnPoint - 1] makes some string, that is
+         dumpped and returned
+ */
 static wchar_t *CFASSFileScriptInfoAllocateEachContent(const wchar_t *name,
                                                        const wchar_t *beginPoint,
                                                        const wchar_t *endPoint,
                                                        size_t *shouldSkip)
 {
-    if(shouldSkip!=NULL) *shouldSkip = 0;
+    if(shouldSkip != NULL) *shouldSkip = 0;
     const wchar_t *searchPoint;
-    if((searchPoint = CF_wcsstr_with_end_point(beginPoint, name, endPoint))!=NULL)
+    if((searchPoint = CF_wcsstr_with_end_point(beginPoint, name, endPoint)) != NULL)
     {
         searchPoint += wcslen(name);
-        (*shouldSkip) += wcslen(name);
-        const wchar_t *contentEndPoint = CF_wcsstr_with_end_point(searchPoint, L"\n", endPoint);
-        if(contentEndPoint!=NULL)
+        const wchar_t *trailReturnPoint = CF_wcsstr_with_end_point(searchPoint, L"\n", endPoint);
+        if(trailReturnPoint != NULL)
         {
-            ptrdiff_t length = contentEndPoint - searchPoint;
-            if(shouldSkip!=NULL) (*shouldSkip) += length;
-            if(length!=0)
-            {
-                wchar_t *result = malloc(sizeof(wchar_t)*(length+1));
-                if(result!=NULL)
-                {
+            if(shouldSkip != NULL) *shouldSkip = trailReturnPoint - beginPoint;
+            // in any kind of condition, just point to next character of '\n'
+            // maybe just '\0'
+            
+            if(searchPoint[0] == L' ') searchPoint++;   // skip prefixed blanks
+            
+            ptrdiff_t length;      // actual allocated size
+            if((length = trailReturnPoint - searchPoint) != 0) {
+                wchar_t *result;
+                if((result = malloc(sizeof(wchar_t) * (length + 1))) != NULL) {
                     wmemcpy(result, searchPoint, length);
                     result[length] = L'\0';
                     return result;
                 }
             }
         }
+        else if(shouldSkip != NULL) *shouldSkip = searchPoint - beginPoint;
+        // beginPoint + shouldSkip point to next character after name("\nTitle:"), maybe just '\0'
     }
     return NULL;
 }
@@ -650,7 +727,7 @@ CFASSFileScriptInfoRef CFASSFileScriptInfoCopy(CFASSFileScriptInfoRef scriptInfo
 {
     /* the fucking loop makes my code seems ugly */
     CFASSFileScriptInfoRef duplicated = malloc(sizeof(struct CFASSFileScriptInfo));
-    if(duplicated==NULL) return NULL;
+    if(duplicated == NULL) return NULL;
     if((duplicated->comment = CFUnicodeStringArrayCopy(scriptInfo->comment)) != NULL) {
         if(scriptInfo->title == NULL || (duplicated->title = CF_Dump_wchar_string(scriptInfo->title)) != NULL){
             if(scriptInfo->original_script == NULL || (duplicated->original_script = CF_Dump_wchar_string(scriptInfo->original_script)) != NULL){
@@ -705,3 +782,5 @@ void CFASSFileScriptInfoDestory(CFASSFileScriptInfoRef scriptInfo)
     free(scriptInfo->play_depth);
     free(scriptInfo);
 }
+
+CLANG_DIAGNOSTIC_POP

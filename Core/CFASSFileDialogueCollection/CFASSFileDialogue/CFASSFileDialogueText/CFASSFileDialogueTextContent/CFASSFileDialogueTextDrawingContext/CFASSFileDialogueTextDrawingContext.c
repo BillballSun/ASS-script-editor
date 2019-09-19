@@ -96,9 +96,9 @@ CFASSFileDialogueTextDrawingContextRef CFASSFileDialogueTextDrawingContextCreate
 
 void CFASSFileDialogueTextDrawingContextDestory(CFASSFileDialogueTextDrawingContextRef context)
 {
-    size_t length = CFPointerArrayGetLength(context->contentArray);
+    size_t arrayCount = CFPointerArrayGetCount(context->contentArray);
     CFASSFileDialogueTextDrawingContextContentRef content;
-    for(size_t index = 0; index<length; index++)
+    for(size_t index = 0; index<arrayCount; index++)
     {
         content = CFPointerArrayGetPointerAtIndex(context->contentArray, index);
         // if(content->type != CFASSFileDialogueTextDrawingContextContentTypeCloseBSpline)  as it is assigned to NULL
@@ -237,9 +237,9 @@ wchar_t *CFASSFileDialogueTextDrawingContextAllocateString(CFASSFileDialogueText
     if(CFASSFileDialogueTextDrawingContextCheckValidation(context))
     {
         FILE *fp;
-        if((fp = tmpfile())!=NULL)
+        if((fp = tmpfile()) != NULL)
         {
-            size_t contentAmount = CFPointerArrayGetLength(context->contentArray);
+            size_t contentAmount = CFPointerArrayGetCount(context->contentArray);
             CFASSFileDialogueTextDrawingContextContentRef content;
             size_t stringLength = 0;
             int temp;
@@ -449,13 +449,13 @@ bool CFASSFileDialogueTextDrawingContextCheckValidation(CFASSFileDialogueTextDra
 {
     CFPointerArrayRef array = context->contentArray;
     CFASSFileDialogueTextDrawingContextContentRef content;
-    size_t length = CFPointerArrayGetLength(context->contentArray);
-    if(length <= 1)
+    size_t arrayCount = CFPointerArrayGetCount(context->contentArray);
+    if(arrayCount <= 1)
         return false;
     if((content = CFPointerArrayGetPointerAtIndex(array, 1))->type != CFASSFileDialogueTextDrawingContextContentTypeMove)
         return false;
     CFASSFileDialogueTextDrawingContextContentType previousType = CFASSFileDialogueTextDrawingContextContentTypeMove;
-    for(size_t index = 2; index<length; index++)
+    for(size_t index = 2; index<arrayCount; index++)
     {
         content = CFPointerArrayGetPointerAtIndex(array, 1);
         if(content->type == CFASSFileDialogueTextDrawingContextContentTypeExtendBSpline &&

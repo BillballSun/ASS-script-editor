@@ -11,6 +11,7 @@
 
 #include <stdbool.h>
 #include "CFGeometry.h"
+#include "CFPointerArray.h"
 
 typedef struct CFASSFileChange *CFASSFileChangeRef;
 
@@ -46,6 +47,8 @@ CFASSFileChangeRef CFASSFileChangeTimeOffset(long hundredths);
 CFASSFileChangeRef CFASSFileChangeBlod(bool blod);
 
 CFASSFileChangeRef CFASSFileChangeCombine(CFASSFileChangeRef change1, CFASSFileChangeRef change2, bool transferOwnershipIfCombinationSuccess);
+
+CFASSFileChangeRef CFASSFileChangeCombineFromArray(CFPointerArrayRef array, bool transferOwnershipOfChangesInArrayIfCombinationSuccess);
 
 CFASSFileChangeRef CFASSFileMultiChangeCombineTermiateWithNULL(bool transferOwnershipIfCombinationSuccess, CFASSFileChangeRef change1, ...);
 

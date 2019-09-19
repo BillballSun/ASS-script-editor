@@ -24,6 +24,10 @@
 #include "CFException.h"
 #include "CFASSFileChange.h"
 #include "CFASSFileChange_Private.h"
+#include "CFASSFileControl.h"
+#include "CFASSFileParsingResult.h"
+#include "CFASSFileParsingResult_Macro.h"
+#include "CFMacro.h"
 
 //[Events]
 //Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -45,9 +49,18 @@ struct CFASSFileDialogue
     CFASSFileDialogueTextRef text;          // if not hace, don't assign NULL
 };
 
-static bool CFASSFileDialogueTimeFormatCheck(CFASSFileDialogueTime time);
+/*!
+ @function CFASSFileDialogueTimeFormatCorrect
+ @abstract Correct a CFASSFileDialogueTime
+ @return if format is already correct, return true
+         otherwise correct it and return false
+ */
+static bool CFASSFileDialogueTimeFormatCorrect(CFASSFileDialogueTime * _Nonnull time);
 
 static CFASSFileDialogueTime CFASSFileDialogueTimeOffset(CFASSFileDialogueTime fromTime, long hundredths);
+
+CLANG_DIAGNOSTIC_PUSH
+CLANG_DIAGNOSTIC_IGNORE_NONNULL
 
 void CFASSFileDialogueMakeChange(CFASSFileDialogueRef dialogue, CFASSFileChangeRef change)
 {
@@ -58,7 +71,7 @@ void CFASSFileDialogueMakeChange(CFASSFileDialogueRef dialogue, CFASSFileChangeR
         dialogue->start = CFASSFileDialogueTimeOffset(dialogue->start, change->timeOffset.hundredths);
         dialogue->end = CFASSFileDialogueTimeOffset(dialogue->end, change->timeOffset.hundredths);
     }
-    if(dialogue->effect!=NULL)
+    if(dialogue->effect != NULL)
         CFASSFileDialogueEffectMakeChange(dialogue->effect, change);
     CFASSFileDialogueTextMakeChange(dialogue->text, change);
 }
@@ -115,8 +128,13 @@ CFASSFileDialogueRef CFASSFileDialogueCopy(CFASSFileDialogueRef dialogue)
     return NULL;
 }
 
-CFASSFileDialogueRef CFASSFileDialogueCreateWithString(const wchar_t *source)
+#pragma mark - Content parsing [解析]
+
+CFASSFileDialogueRef CFASSFileDialogueCreateWithString(const wchar_t * _Nonnull source, CFASSFileParsingResultRef _Nonnull parsingResult)
 {
+    DEBUG_ASSERT(source != NULL && parsingResult != NULL);
+    if(source == NULL || parsingResult == NULL) return NULL;
+    
     unsigned int layer;
     CFASSFileDialogueTime start, end;
     wchar_t *style, *name;
@@ -125,116 +143,188 @@ CFASSFileDialogueRef CFASSFileDialogueCreateWithString(const wchar_t *source)
     CFASSFileDialogueTextRef text;          // if not hace assign NULL
     int temp, scanAmount = 0;
     wchar_t timeFormat1[2], timeFormat2[2];
+    
+#pragma mark time
+    
+    // scanf only skip blank character if it is %x format, and counted into %n
     temp = swscanf(source, L"Dialogue:%u,%u:%u:%u%1l[:.]%u,%u:%u:%u%1l[:.]%u,%n",
                    &layer,
                    &start.hour, &start.min, &start.sec, timeFormat1, &start.hundredths,
-                   &end.hour, &end.min, &end.sec, timeFormat2 ,&end.hundredths, &scanAmount);
-    if(temp != 11
-       || source[scanAmount-1] != L','
-       || source[scanAmount]==L'\0'
-       || source[scanAmount] == L'\n')
+                     &end.hour,   &end.min,   &end.sec, timeFormat2,   &end.hundredths, &scanAmount);
+    if(temp != 11                                                           ||
+       scanAmount <= 0                    /* mostly impossible */           ||
+       source[scanAmount - 1] != L','     /* just make access valid */      ||
+       source[scanAmount] == L'\0'                                          ||
+       source[scanAmount] == L'\n') {
+        PR_ERROR(source, L"CFASSFileDialogue parsing time format failed, patten "
+                          "\"Dialogue:%%u,%%u:%%u:%%u%%1l[:.]%%u,%%u:%%u:%%u%%1l[:.]%%u,\"");
         return NULL;
+    }
+    
+    CFASSFileControlLevel controlLevel = CFASSFileControlGetLevel();
     
     if(*timeFormat1 == L':')
     {
-        if(start.hundredths > 59) return NULL;
-        start.hundredths*= (10.0/3);
-        if(start.hundredths>99) start.hundredths = 99;
-    }
-    if(*timeFormat2 == L':')
-    {
-        if(end.hundredths > 59) return NULL;
-        end.hundredths*= (10.0/3);
-        if(end.hundredths>99) end.hundredths = 99;
+        if(start.hundredths > 59) {
+            if(controlLevel & CFASSFileControlLevelIgnore) {
+                PR_WARN(source, L"CFASSFileDialogue beginTime format patten hour:min:sec:ms ms larger than 59, auto-correct to 59");
+                start.hundredths = 59;
+            }
+            else {
+                PR_ERROR(source, L"CFASSFileDialogue beginTime format patten hour:min:sec:ms ms larger than 59");
+                return NULL;
+            }
+        }
+        start.hundredths *= (10.0 / 3);
+        if(start.hundredths > 99) start.hundredths = 99;
     }
     
-    if(!CFASSFileDialogueTimeFormatCheck(start) || !CFASSFileDialogueTimeFormatCheck(end))
+    if(*timeFormat2 == L':')
+    {
+        if(end.hundredths > 59) {
+            if(controlLevel & CFASSFileControlLevelIgnore) {
+                PR_WARN(source, L"CFASSFileDialogue endTime format patten hour:min:sec:ms ms larger than 59, auto-correct to 59");
+                end.hundredths = 59;
+            }
+            else {
+                PR_ERROR(source, L"CFASSFileDialogue endTime format patten hour:min:sec:ms ms larger than 59");
+                return NULL;
+            }
+        }
+        end.hundredths *= (10.0 / 3);
+        if(end.hundredths > 99) end.hundredths = 99;
+    }
+    
+    bool timeFormatCheck1 = CFASSFileDialogueTimeFormatCorrect(&start);
+    bool timeFormatCheck2 = CFASSFileDialogueTimeFormatCorrect(&end);
+    
+    if((!(controlLevel & CFASSFileControlLevelIgnore)) && (!timeFormatCheck1 || !timeFormatCheck2)) {
+        PR_ERROR(source, L"CFASSFileDialogue time format check failed");
         return NULL;
+    }
+    
     source += scanAmount;
     const wchar_t *tokenEnd;
     tokenEnd = source;
-    while(*tokenEnd !=L',' && *tokenEnd !=L'\0' && *tokenEnd !=L'\n') tokenEnd++;
-    if(*tokenEnd != L',')
+    
+#pragma mark style
+    
+    // tokenEnd, at most left is source
+    // find to set tokenEnd to the token ','
+    // may search to the end of line or string
+    while(*tokenEnd != L',' && *tokenEnd != L'\0' && *tokenEnd != L'\n') tokenEnd++;
+    if(*tokenEnd != L',') {
+        PR_ERROR(source, L"CFASSFileDialogue find style name token failed");
         return NULL;
-    tokenEnd--;
-    if(tokenEnd<source)
-        style = NULL;
-    else
-    {
-        if((style = malloc(sizeof(wchar_t)*(tokenEnd-source+1+1))) == NULL)
-            return NULL;
-        wmemcpy(style, source, tokenEnd-source+1);
-        style[tokenEnd-source+1] = L'\0';
     }
-    source = tokenEnd+2;
-    tokenEnd = source;
-    while(*tokenEnd !=L',' && *tokenEnd !=L'\0' && *tokenEnd !=L'\n') tokenEnd++;
-    if(*tokenEnd != L',')
-        return NULL;
     tokenEnd--;
-    if(tokenEnd<source)
-        name = NULL;
+    if(tokenEnd < source) {
+        PR_WARN(source, L"CFASSFileDialogue style name not found");
+        style = NULL;
+    }
     else
     {
-        if((name = malloc(sizeof(wchar_t)*(tokenEnd-source+1+1))) == NULL)
-        {
-            if(style!=NULL) free(style);
+        if((style = malloc(sizeof(wchar_t) * (tokenEnd - source + 1 + 1))) == NULL) {
+            PR_INFO(NULL, L"CFASSFileDialogue allocation for style name failed");
             return NULL;
         }
-        wmemcpy(name, source, tokenEnd-source+1);
-        name[tokenEnd-source+1] = L'\0';
+        wmemcpy(style, source, tokenEnd - source + 1);
+        style[tokenEnd - source + 1] = L'\0';
     }
-    source  = tokenEnd+2;
-    temp = swscanf(source, L"%u,%u,%u,%n",
-                   &marginL, &marginR, &marginV,
-                   &scanAmount);
-    if(temp != 3
-       || source[scanAmount-1] != L','
-       || source[scanAmount]==L'\0'
-       || source[scanAmount] == L'\n')
+    source = tokenEnd + 2;  // when searched tokenEnd is at ',' but tokenEnd-- backward one
+    tokenEnd = source;
+    
+#pragma mark character name
+    
+    while(*tokenEnd != L',' && *tokenEnd != L'\0' && *tokenEnd != L'\n') tokenEnd++;
+    if(*tokenEnd != L',') {
+        PR_ERROR(source, L"CFASSFileDialogue find character name token failed");
+        return NULL;
+    }
+    tokenEnd--;
+    if(tokenEnd < source)
+        name = NULL;        // mostly acceptable
+    else
     {
-        if(style!=NULL) free(style);
-        if(name!=NULL) free(name);
+        if((name = malloc(sizeof(wchar_t) * (tokenEnd - source + 1 + 1))) == NULL)
+        {
+            PR_INFO(NULL, L"CFASSFileDialogue allocation for character name failed");
+            if(style != NULL) free(style);
+            return NULL;
+        }
+        wmemcpy(name, source, tokenEnd - source + 1);
+        name[tokenEnd - source + 1] = L'\0';
+    }
+    source  = tokenEnd + 2;
+    
+#pragma mark marginL marginR marginV
+    
+    scanAmount = 0;
+    
+    temp = swscanf(source, L"%u,%u,%u,%n", &marginL, &marginR, &marginV, &scanAmount);
+    if(temp != 3                                ||
+       scanAmount <= 0                          ||
+       source[scanAmount - 1] != L','           ||
+       source[scanAmount] == L'\0'              ||
+       source[scanAmount] == L'\n') {
+        PR_ERROR(source, L"CFASSFileDialogue match marginL marginR marginV failed, patten \"%%u,%%u,%%u,\"");
+        if(style != NULL) free(style);
+        if(name != NULL) free(name);
         return NULL;
     }
     source += scanAmount;
     tokenEnd = source;
-    while(*tokenEnd !=L',' && *tokenEnd !=L'\0' && *tokenEnd !=L'\n') tokenEnd++;
+    
+#pragma mark effect
+    
+    while(*tokenEnd != L',' && *tokenEnd != L'\0' && *tokenEnd != L'\n') tokenEnd++;
     if(*tokenEnd != L',')
     {
-        if(style!=NULL) free(style);
-        if(name!=NULL) free(name);
+        PR_ERROR(source, L"CFASSFileDialogue find effect token failed");
+        if(style != NULL) free(style);
+        if(name != NULL) free(name);
         return NULL;
     }
     tokenEnd--;
-    if(tokenEnd<source)
-        effect = NULL;
+    if(tokenEnd < source)
+        effect = NULL;          // mostly accpetable
     else
     {
-        effect = CFASSFileDialogueEffectCreateWithString(source, tokenEnd);
-        if(effect == NULL)
+        effect = CFASSFileDialogueEffectCreateWithString(source, tokenEnd, parsingResult);
+        if(effect == NULL && (controlLevel & CFASSFileControlLevelIgnore))
         {
-            if(style!=NULL) free(style);
-            if(name!=NULL) free(name);
+            PR_ERROR(source, L"CFASSFileDialogue effect create failed");
+            if(style != NULL) free(style);
+            if(name != NULL) free(name);
             return NULL;
         }
     }
-    source = tokenEnd+2;
-    text = CFASSFileDialogueTextCreateWithString(source);
+    source = tokenEnd + 2;
+    
+#pragma mark dialogue text
+    
+    // source may point to '\0' or '\n' but just point to raw content
+    text = CFASSFileDialogueTextCreateWithString(source, parsingResult);
     if(text == NULL)
     {
-        if(style!=NULL) free(style);
-        if(name!=NULL) free(name);
-        if(effect!=NULL) CFASSFileDialogueEffectDestory(effect);
+        PR_ERROR(source, L"CFASSFileDialogue text create failed");
+        if(style != NULL) free(style);
+        if(name != NULL) free(name);
+        if(effect != NULL) CFASSFileDialogueEffectDestory(effect);
         return NULL;
     }
+    
+#pragma mark construction
+    
     CFASSFileDialogueRef result = malloc(sizeof(struct CFASSFileDialogue));
     if(result == NULL)
     {
-        if(style!=NULL) free(style);
-        if(name!=NULL) free(name);
-        if(effect!=NULL) CFASSFileDialogueEffectDestory(effect);
-        if(text!=NULL) CFASSFileDialogueTextDestory(text);
+        PR_INFO(NULL, L"CFASSFileDialogue allocation failed");
+        if(style != NULL) free(style);
+        if(name != NULL) free(name);
+        if(effect != NULL) CFASSFileDialogueEffectDestory(effect);
+        if(text != NULL) CFASSFileDialogueTextDestory(text);
+        return NULL;
     }
     result->layer = layer;
     result->start = start;
@@ -249,10 +339,14 @@ CFASSFileDialogueRef CFASSFileDialogueCreateWithString(const wchar_t *source)
     return result;
 }
 
-static bool CFASSFileDialogueTimeFormatCheck(CFASSFileDialogueTime time)
+static bool CFASSFileDialogueTimeFormatCorrect(CFASSFileDialogueTime * _Nonnull time)
 {
-    if(time.min>59 || time.sec>59 || time.hundredths >99) return false;
-    return true;
+    DEBUG_ASSERT(time != NULL); if(time == NULL) return false;
+    bool result = true;
+    if(time->min > 59) { time->min = 59; result = false; }
+    if(time->sec > 59) { time->sec = 59; result = false; }
+    if(time->hundredths > 59) { time->hundredths = 59; result = false; }
+    return result;
 }
 
 int CFASSFileDialogueStoreStringResult(CFASSFileDialogueRef dialogue, wchar_t *targetPoint)
@@ -271,8 +365,8 @@ int CFASSFileDialogueStoreStringResult(CFASSFileDialogueRef dialogue, wchar_t *t
         result += temp;
 
         temp = fwprintf(fp, L"%ls,%ls,%u,%u,%u,",
-                        dialogue->style==NULL?L"":dialogue->style,
-                        dialogue->name==NULL?L"":dialogue->name,
+                        dialogue->style == NULL?L"":dialogue->style,
+                        dialogue->name == NULL?L"":dialogue->name,
                         dialogue->marginL, dialogue->marginR, dialogue->marginV);
         if(temp < 0) return -1;
         result += temp;
@@ -304,8 +398,8 @@ int CFASSFileDialogueStoreStringResult(CFASSFileDialogueRef dialogue, wchar_t *t
         result += temp;
         targetPoint += temp;
         temp = swprintf(targetPoint, SIZE_MAX, L"%ls,%ls,%u,%u,%u,",
-                        dialogue->style==NULL?L"":dialogue->style,
-                        dialogue->name==NULL?L"":dialogue->name,
+                        dialogue->style == NULL?L"":dialogue->style,
+                        dialogue->name == NULL?L"":dialogue->name,
                         dialogue->marginL, dialogue->marginR, dialogue->marginV);
         if(temp < 0) return -1;
         result += temp;
@@ -335,9 +429,11 @@ int CFASSFileDialogueStoreStringResult(CFASSFileDialogueRef dialogue, wchar_t *t
 
 void CFASSFileDialogueDestory(CFASSFileDialogueRef dialogue)
 {
-    if(dialogue->style!=NULL) free(dialogue->style);
-    if(dialogue->name!=NULL) free(dialogue->name);
-    if(dialogue->effect!=NULL) CFASSFileDialogueEffectDestory(dialogue->effect);
+    if(dialogue->style != NULL) free(dialogue->style);
+    if(dialogue->name != NULL) free(dialogue->name);
+    if(dialogue->effect != NULL) CFASSFileDialogueEffectDestory(dialogue->effect);
     CFASSFileDialogueTextDestory(dialogue->text);
     free(dialogue);
 }
+
+CLANG_DIAGNOSTIC_POP

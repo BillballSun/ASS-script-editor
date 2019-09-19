@@ -8,7 +8,6 @@
 
 #include <wchar.h>
 #include <stdlib.h>
-
 #include "CFASSFile.h"
 #include "CFASSFile_Private.h"
 #include "CFASSFileDialogueCollection.h"
@@ -19,7 +18,12 @@
 #include "CFEnumerator.h"
 #include "CFException.h"
 #include "CFASSFileControl.h"
-#include "CFASSFileControl_Private.h"
+#include "CFASSFileParsingResult.h"
+#include "CFASSFileParsingResult_Macro.h"
+#include "CFMacro.h"
+
+CLANG_DIAGNOSTIC_PUSH
+CLANG_DIAGNOSTIC_IGNORE_NONNULL
 
 struct CFASSFileDialogueCollection
 {
@@ -46,10 +50,10 @@ CFASSFileDialogueCollectionRef CFASSFileDialogueCollectionCopy(CFASSFileDialogue
         result->registeredFile = NULL;
         if((result->collectionArray = CFPointerArrayCreateEmpty()) != NULL)
         {
-            size_t arrayLength = CFPointerArrayGetLength(dialogueCollection->collectionArray);
+            size_t arrayCount = CFPointerArrayGetCount(dialogueCollection->collectionArray);
             bool copyCheck = true;
             CFASSFileDialogueRef eachDialogue;
-            for(size_t index = 0; index<arrayLength && copyCheck; index++)
+            for(size_t index = 0; index < arrayCount && copyCheck; index++)
             {
                 eachDialogue = CFASSFileDialogueCopy
                 ((CFASSFileDialogueRef)CFPointerArrayGetPointerAtIndex(dialogueCollection->collectionArray, index));
@@ -60,8 +64,8 @@ CFASSFileDialogueCollectionRef CFASSFileDialogueCollectionCopy(CFASSFileDialogue
             }
             if(copyCheck)
                 return result;
-            arrayLength = CFPointerArrayGetLength(result->collectionArray);
-            for(size_t index = 0; index<arrayLength; index++)
+            arrayCount = CFPointerArrayGetCount(result->collectionArray);
+            for(size_t index = 0; index < arrayCount; index++)
                 CFASSFileDialogueDestory
                 ((CFASSFileDialogueRef)CFPointerArrayGetPointerAtIndex(result->collectionArray, index));
             CFPointerArrayDestory(result->collectionArray);
@@ -81,8 +85,8 @@ CFEnumeratorRef CFASSFileDialogueCollectionCreateEnumerator(CFASSFileDialogueCol
 void CFASSFileDialogueCollectionDestory(CFASSFileDialogueCollectionRef dialogueCollection)
 {
     if(dialogueCollection == NULL) return;
-    size_t arrayLength = CFPointerArrayGetLength(dialogueCollection->collectionArray);
-    for(size_t index = 0; index<arrayLength; index++)
+    size_t arrayCount = CFPointerArrayGetCount(dialogueCollection->collectionArray);
+    for(size_t index = 0; index < arrayCount; index++)
         CFASSFileDialogueDestory(CFPointerArrayGetPointerAtIndex(dialogueCollection->collectionArray, index));
     CFPointerArrayDestory(dialogueCollection->collectionArray);
     free(dialogueCollection);
@@ -99,52 +103,49 @@ int CFASSFileDialogueCollectionRegisterAssociationwithFile(CFASSFileDialogueColl
         return -1;
 }
 
-CFASSFileDialogueCollectionRef CFASSFileDialogueCollectionCreateWithUnicodeFileContent(const wchar_t *content)
-{
+CFASSFileDialogueCollectionRef CFASSFileDialogueCollectionCreateWithUnicodeFileContent(const wchar_t * _Nonnull content,
+                                                                                       CFASSFileParsingResultRef _Nonnull parsingResult) {
+    DEBUG_ASSERT(content != NULL && parsingResult != NULL);
+    if(content == NULL || parsingResult == NULL) return NULL;
+    
     wchar_t *searchPoint;
     if((searchPoint = wcsstr(content, L"\n[Events]")) != NULL)
     {
         searchPoint = wcsstr(searchPoint, L"\nDialogue:");
-        if(searchPoint == NULL)
-            return NULL;
+        if(searchPoint == NULL) return NULL;
+        
         CFASSFileDialogueCollectionRef result;
         if((result = malloc(sizeof(struct CFASSFileDialogueCollection))) != NULL)
         {
-            result->registeredFile = NULL;
-            if((result->collectionArray = CFPointerArrayCreateEmpty())!=NULL)
+            if((result->collectionArray = CFPointerArrayCreateEmpty()) != NULL)
             {
+                CFASSFileControlLevel controlLevel = CFASSFileControlGetLevel();
                 size_t skipLength = wcslen(L"\nDialogue:");
                 CFASSFileDialogueRef eachDialogue;
                 bool formatCheck = true;
                 while(formatCheck && (searchPoint = wcsstr(searchPoint, L"\nDialogue:")) != NULL)
                 {
-                    eachDialogue = CFASSFileDialogueCreateWithString(searchPoint+1);
+                    eachDialogue = CFASSFileDialogueCreateWithString(searchPoint + 1, parsingResult);
                     if(eachDialogue == NULL)
                     {
-                        CFASSFileControlErrorHandling errorHandle = CFASSFileControlGetErrorHandling();
-                        if(!(errorHandle & CFASSFileControlErrorHandlingIgnore))
-                            formatCheck = false;
-                        else
-                            searchPoint += skipLength;
-                        if(errorHandle & CFASSFileControlErrorHandlingOutput)
-                            CFASSFileControlErrorOutput(content, searchPoint+1);
+                        if(!(controlLevel & CFASSFileControlLevelIgnore)) formatCheck = false; // error handling
+                        PR_ERROR(searchPoint + 1, L"CFASSFileDialogue create failed");
                     }
-                    else
-                    {
-                        CFPointerArrayAddPointer(result->collectionArray, eachDialogue, false);
-                        searchPoint += skipLength;
-                    }
+                    else CFPointerArrayAddPointer(result->collectionArray, eachDialogue, false);
+                    searchPoint += skipLength;
                 }
-                if(formatCheck)
+                if(formatCheck) {
+                    result->registeredFile = NULL;
                     return result;
-                size_t arrayLength = CFPointerArrayGetLength(result->collectionArray);
-                for(size_t index = 0; index<arrayLength; index++)
+                }
+                size_t arrayCount = CFPointerArrayGetCount(result->collectionArray);
+                for(size_t index = 0; index < arrayCount; index++)
                     CFASSFileDialogueDestory(CFPointerArrayGetPointerAtIndex(result->collectionArray, index));
                 CFPointerArrayDestory(result->collectionArray);
             }
             free(result);
         }
-    }
+    } else PR_ERROR(searchPoint, L"CFASSFileDialogueCollection \"[Events]\" match failed");
     return NULL;
 }
 
@@ -156,8 +157,8 @@ wchar_t *CFASSFileDialogueCollectionAllocateFileContent(CFASSFileDialogueCollect
     stringLength += prefixLength;
     
     int temp;
-    size_t arrayLength = CFPointerArrayGetLength(dialogueCollection->collectionArray);
-    for(size_t index = 0; index<arrayLength; index++)
+    size_t arrayCount = CFPointerArrayGetCount(dialogueCollection->collectionArray);
+    for(size_t index = 0; index<arrayCount; index++)
     {
         temp = CFASSFileDialogueStoreStringResult(CFPointerArrayGetPointerAtIndex(dialogueCollection->collectionArray, index), NULL);
         if(temp == -1) return NULL;
@@ -165,22 +166,24 @@ wchar_t *CFASSFileDialogueCollectionAllocateFileContent(CFASSFileDialogueCollect
     }
     
     wchar_t *result;
-    if((result = malloc(sizeof(wchar_t)*(stringLength+1)))!=NULL)
+    if((result = malloc(sizeof(wchar_t) * (stringLength + 1))) != NULL)
     {
-        swprintf(result, SIZE_MAX, L"[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n");
+        swprintf(result, stringLength + 1, L"[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n");
         wchar_t *currentPoint = result + prefixLength;
         bool formatCheck = true;
-        for(size_t index = 0; index<arrayLength && formatCheck; index++)
+        for(size_t index = 0; index < arrayCount && formatCheck; index++)
         {
             temp = CFASSFileDialogueStoreStringResult(CFPointerArrayGetPointerAtIndex(dialogueCollection->collectionArray, index), currentPoint);
-            if(temp<0)
+            if(temp < 0)
                 formatCheck = false;
             else
                 currentPoint += temp;
         }
-        if(formatCheck)
-            return result;
+        DEBUG_ASSERT(formatCheck && (wcslen(result) == stringLength));
+        if(formatCheck) return result;
         free(result);
     }
     return NULL;
 }
+
+CLANG_DIAGNOSTIC_POP
